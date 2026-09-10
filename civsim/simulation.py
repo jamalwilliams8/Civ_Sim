@@ -1,7 +1,7 @@
 ﻿"""
 civsim/simulation.py
 Central execution engine managing sequential tick loops across environmental, 
-social, economic, governance, law, culture, occupations, defense, religion, and tech layers.
+social, economic, governance, law, culture, occupations, defense, religion, libraries, and tech layers.
 """
 
 import random
@@ -22,7 +22,8 @@ from civsim.law import resolve_social_friction_and_law
 from civsim.culture import CultureRegistry  
 from civsim.occupations import resolve_occupations          
 from civsim.military import resolve_military_and_raiders    
-from civsim.religion import resolve_miracles_and_belief     # Linked Religion Module
+from civsim.religion import resolve_miracles_and_belief     
+from civsim.library import resolve_libraries_and_preservation  # Linked Library Module
 from civsim.history import CausalityEngine  
 
 
@@ -77,23 +78,26 @@ class Simulation:
         resolve_settlements(self.agents, self.settlements, self.current_tick)
         resolve_governance_decisions(self.world, self.agents, self.settlements, self.current_tick, self.culture_registry)
         
-        # 2. Labor & Military Loops
+        # 2. Labor Specializations & Military Events
         resolve_occupations(self.agents, self.settlements)
         resolve_military_and_raiders(self.world, self.agents, self.settlements, self.current_tick)
         
-        # 3. FIX: Run Phase 3 Emergent Miracles and Belief Calculations
+        # 3. Phase 3 Religion, Beliefs and Miracles
         resolve_miracles_and_belief(self.world, self.agents, self.settlements, self.current_tick)
         
-        # 4. Economic, Social Order & Public Safety Loops
+        # 4. FIX: Run Phase 2/4 Archive Libraries & Written Preservation Checks
+        resolve_libraries_and_preservation(self.agents, self.settlements, self.tech_registry)
+        
+        # 5. Economy & Law Enforcement Systems
         resolve_economic_barter_trade(self.world, self.settlements)
         resolve_social_friction_and_law(self.world, self.agents, self.settlements, self.current_tick)
         
-        # 5. Infrastructure and Extraction Upkeeps
+        # 6. Environmental Upkeeps and Dynamic Carrying Capacities
         resolve_wilderness_hazards(self.agents, self.settlements, self.current_tick)
         resolve_housing_infrastructure(self.agents, self.settlements)
         resolve_resource_production(self.world, self.agents, self.tech_registry)
         
-        # 6. Technology Innovations Caching
+        # 7. Technological Innovation Tracking
         cohort_cache = {}
         for cohort in self.agents.cohorts.values():
             if cohort.settlement_id:
@@ -107,12 +111,12 @@ class Simulation:
             
         self.tech_registry.resolve_innovation(self.settlements, self.current_tick)
         
-        # 7. Demographics Lifecycles
+        # 8. Demographic Consumption Lifecycles
         resolve_food_and_health(self.world, self.agents)
         self.world.tick_ecosystem(self.agents)
         resolve_birth_and_death(self.agents, self.current_tick)
 
-        # 8. Graph Node Logging
+        # 9. Graph Auditing Node Entries
         for s_id, s in self.settlements.settlements.items():
             if s_id not in pre_step_active:
                 cult = self.culture_registry.get_culture(s_id)

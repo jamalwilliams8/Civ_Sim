@@ -1,45 +1,80 @@
+﻿"""
+civsim/world.py
+Persistent environment map: tracks tile-by-tile wild resources, soil health degradation vectors, 
+and global cyclical Weather/Climate patterns.
 """
-The physical world: a grid of tiles, each with terrain and resources.
-No agents live here yet — this step is just the space they'll occupy.
-"""
 
-from dataclasses import dataclass, field
+import random
+
+WEATHER_TYPES = ["NORMAL", "WET", "ARID", "DROUGHT", "FREEZE"]
 
 
-@dataclass
 class Tile:
-    x: int
-    y: int
-    terrain: str = "plains"       # e.g. "plains", "forest", "water"
-    food_wild: float = 10.0       # current wild food available on this tile
-    max_food_wild: float = 10.0   # ceiling this tile regenerates back toward
-    regen_rate: float = 0.5       # food regrown per tick, up to max_food_wild
+    def __init__(self, x: int, y: int, max_food: float, food_wild: float, soil_health: float, regen_rate: float):
+        self.x = x
+        self.y = y
+        self.max_food_wild = max_food
+        self.food_wild = food_wild
+        self.soil_health = soil_health
+        self.regen_rate = regen_rate
 
 
 class World:
-    def __init__(self, width: int, height: int, rng):
+    def __init__(self, width: int, height: int, rng=None):
         self.width = width
         self.height = height
-        self.rng = rng  # a random.Random stream, e.g. sim_rng.stream("world")
-        self.tiles: dict[tuple[int, int], Tile] = {}
-        self._generate()
-
-    def _generate(self) -> None:
-        """Create every tile in the grid with a randomly chosen terrain type."""
-        terrain_choices = ["plains", "forest", "water"]
-        for x in range(self.width):
-            for y in range(self.height):
-                terrain = self.rng.choice(terrain_choices)
-                self.tiles[(x, y)] = Tile(x=x, y=y, terrain=terrain)
+        self.tiles = {}
+        self.current_weather = "NORMAL"
+        
+        for x in range(width):
+            for y in range(height):
+                self.tiles[(x, y)] = Tile(
+                    x=x, y=y,
+                    max_food=10.0,
+                    food_wild=10.0,
+                    soil_health=1.0,
+                    regen_rate=0.4
+                )
 
     def get_tile(self, x: int, y: int) -> Tile:
         return self.tiles[(x, y)]
 
-    def tick(self) -> None:
-        """Advance every tile by one tick: regenerate wild food toward its max."""
-        for tile in self.tiles.values():
+    def tick_ecosystem(self, agents_registry) -> None:
+        """Processes environment changes, climate trends, and soil load carrying capacities."""
+        # 1. Update Cyclical Weather Patterns
+        if random.random() < 0.10:
+            self.current_weather = random.choice(WEATHER_TYPES)
+
+        # 2. Compute resource depletion and consumption impacts per cell
+        occupancy = {}
+        for agent in agents_registry.raw_living_agents():
+            pos = (agent.x, agent.y)
+            occupancy[pos] = occupancy.get(pos, 0) + 1
+
+        for c_pos, cohort in agents_registry.cohorts.items():
+            occupancy[c_pos] = occupancy.get(c_pos, 0) + cohort.count
+
+        # Apply climate multipliers
+        weather_modifier = 1.0
+        if self.current_weather == "DROUGHT":
+            weather_modifier = 0.25  # Famine condition
+        elif self.current_weather == "FREEZE":
+            weather_modifier = 0.00  # Starvation risk layer
+
+        for pos, tile in self.tiles.items():
+            load = occupancy.get(pos, 0)
+            
+            # Soil degradation vectors
+            if load > 40:
+                tile.soil_health = max(0.05, tile.soil_health - (load * 0.001))
+            else:
+                tile.soil_health = min(1.0, tile.soil_health + 0.005)
+
+            # Regeneration cycle
             if tile.food_wild < tile.max_food_wild:
-                tile.food_wild = min(
-                    tile.max_food_wild,
-                    tile.food_wild + tile.regen_rate,
-                )
+                regen = tile.regen_rate * tile.soil_health * weather_modifier
+                tile.food_wild = min(tile.max_food_wild, tile.food_wild + regen)
+
+            # Population extraction depletion
+            if load > 0:
+                tile.food_wild = max(0.0, tile.food_wild - (load * 0.15))
