@@ -1,0 +1,2721 @@
+
+
+last update :
+
+before our chat ends, summarize last changes 
+tell me what you plan to do next
+reiterate roadmap/goals
+
+
+im coding this project and im using the free plan so lets maximize efficiency! so just tell me what to edit and where
+specify if its a full code update or one change
+
+give me the full updated file to paste over yours, if that's easier than tracking individual line edits). Want me to switch to giving you complete files each time instead of diffs, to eliminate this class of error?
+
+
+
+
+
+last we spoke you did this:
+
+behavior.py fix (0 dead 50 ticks)
+So: settlements first, minimal version — agents that cluster densely and stay together for a while form a settlement, settlement membership persists with grace period, and members get a small survival/food benefit for being in one. That gives us the object that hysteresis, hazard, and diagnostics all hook into.
+
+What to edit, in order
+
+1. civsim/agents.py — single change. Add one field to the Agent dataclass, right after death_cause:
+
+python
+    settlement_id: str | None = None
+
+2. civsim/population.py — two small changes.
+
+Add a constant near the top, next to BASE_BIRTH_CHANCE_PER_FERTILE_AGENT:
+
+python
+SETTLEMENT_STARVATION_BUFFER = 0.5          # settlement members lose less health when unfed (food coordination)
+
+In resolve_food_and_health, replace:
+
+python
+        else:
+            agent.health -= HEALTH_LOSS_IF_UNFED
+
+with:
+
+python
+        else:
+            loss = HEALTH_LOSS_IF_UNFED
+            if agent.settlement_id is not None:
+                loss *= SETTLEMENT_STARVATION_BUFFER
+            agent.health -= loss
+
+3. civsim/simulation.py — three small changes.
+
+Add to the imports:
+
+python
+from civsim.settlements import SettlementRegistry, resolve_settlements
+
+In __init__, right after self.agents = AgentRegistry():
+
+python
+        self.settlements = SettlementRegistry()
+
+In step(), right after the resolve_movement(...) line:
+
+python
+        resolve_settlements(self.agents, self.settlements, self.current_tick)
+
+4. civsim/settlements.py — brand new file, full contents:
+
+(all working i think, no way to verify settlements)
+
+
+
+
+
+
+
+
+
+
+# BUILD PROMPT: ARTIFICIAL CIVILIZATION SIMULATOR
+
+You are the lead architect and senior software engineer responsible for building a persistent, emergent civilization simulation.
+
+Build the system described below as a real, working application — not a mockup, prototype full of placeholders, or collection of disconnected demonstrations.
+
+The finished product should feel like:
+
+> “I created a world, released civilizations into it, and watched history happen.”
+
+It should NOT feel like:
+
+> “I entered parameters and received a numerical result.”
+
+The simulation must be:
+
+* Emergent
+* Persistent
+* Explainable
+* Reproducible
+* Deterministic when given the same seed/configuration/version
+* Computationally efficient
+* Modular
+* Debuggable
+* Observable
+* Capable of extremely long simulations
+* Capable of producing unexpected historical outcomes
+* Capable of supporting very large populations without simulating every person at maximum detail
+
+Do not script historical outcomes.
+
+Create the systems, incentives, constraints, opportunities, and feedback loops that allow history to emerge.
+
+---
+
+# 1. CRITICAL ARCHITECTURAL REQUIREMENT
+
+## Hybrid persistent-individual architecture
+
+Every human must conceptually exist as a persistent individual with:
+
+* Unique ID
+* Generation
+* Age
+* Sex
+* Health
+* Personality
+* Intelligence
+* Skills
+* Wealth
+* Job/occupation
+* Needs
+* Relationships
+* Family
+* Beliefs
+* Political beliefs
+* Memory
+* Goals
+* Reputation
+* Location
+* Knowledge
+* Inventory
+* History
+* Civilization affiliation
+* Settlement affiliation where applicable
+
+However, DO NOT fully simulate every individual every tick when populations become large.
+
+Separate:
+
+### Agent existence
+
+Whether the individual exists in the simulated world.
+
+from:
+
+### Agent simulation resolution
+
+How much computational attention is spent simulating that individual.
+
+Every individual remains persistent even when simulated at low resolution.
+
+Agents must be able to transition dynamically between:
+
+LOW → MEDIUM → HIGH resolution
+
+without losing:
+
+* Identity
+* Relationships
+* Attributes
+* Memories
+* Knowledge
+* Family
+* Location
+* History
+* Reputation
+* Ownership
+* Political status
+
+The observer must be able to locate and inspect an individual even if that individual is currently low-resolution.
+
+---
+
+# 2. ADAPTIVE RESOLUTION
+
+Implement three primary simulation resolutions.
+
+## LOW RESOLUTION
+
+For ordinary population members.
+
+Track only information necessary for population-scale simulation:
+
+* Age
+* Sex
+* Health
+* Occupation
+* Location
+* Family linkage
+* Basic personality traits
+* Wealth/resource class
+* Civilization
+* Settlement
+* Basic needs
+* Demographic state
+
+Do NOT execute complex decision-making every tick.
+
+Use statistical/aggregated calculations where appropriate.
+
+## MEDIUM RESOLUTION
+
+Used for locally relevant people.
+
+Examples:
+
+* Skilled workers
+* Local political participants
+* Merchants
+* Teachers
+* Soldiers
+* Religious figures
+* Community organizers
+* People involved in important local events
+* People with unusual influence
+* People whose decisions may affect other agents
+
+Track:
+
+* Personality
+* Relationships
+* Goals
+* Beliefs
+* Skills
+* Economic behavior
+* Decision making
+* Local memory
+* Knowledge
+* Reputation
+
+## HIGH RESOLUTION
+
+Used for historically significant individuals.
+
+Examples:
+
+* Leaders
+* Inventors
+* Generals
+* Diplomats
+* Explorers
+* Scientists
+* Criminal leaders
+* Religious founders
+* Political revolutionaries
+* Major merchants
+* Historically important ordinary people
+
+Track detailed:
+
+* Decisions
+* Memory
+* Relationships
+* Politics
+* Leadership
+* Technology
+* Actions
+* Events
+* Goals
+* Knowledge
+* Strategy
+* Reputation
+* Personal history
+
+The system must automatically promote/demote simulation resolution according to relevance.
+
+Potential promotion triggers:
+
+* Becoming a leader
+* Inventing something
+* Becoming wealthy
+* Becoming politically influential
+* Joining a major conflict
+* Becoming a military commander
+* Discovering a resource
+* Becoming a criminal leader
+* Becoming a religious leader
+* Becoming involved in a major event
+* Developing unusual skills
+* Becoming historically significant
+* Being directly observed by the user
+* Becoming part of an active causal chain
+
+Resolution should also decay when an agent is no longer relevant.
+
+Never delete an agent simply because their resolution decreases.
+
+---
+
+# 3. COMPUTATIONAL EFFICIENCY IS A CORE REQUIREMENT
+
+Optimize for simulation throughput.
+
+Do not waste CPU cycles on meaningless microscopic actions.
+
+Use:
+
+* Discrete simulation ticks
+* Aggregated population calculations
+* Adaptive-resolution agents
+* Event compression
+* Important-event logging
+* Periodic state snapshots
+* Lazy calculations
+* Cached derived values
+* Spatial partitioning
+* Efficient lookup structures
+* Batched population calculations
+* Dirty-state updates
+* Priority queues where appropriate
+* Incremental recalculation
+* Deterministic seeded randomness
+* Background/noncritical calculations where safe
+* Historical event summarization
+* Automatic pruning/compression of insignificant events
+
+Do not generate an event for every trivial action.
+
+Example:
+
+Do NOT log:
+
+> Agent 381 picked up one piece of wood.
+
+Instead aggregate insignificant activity.
+
+Log:
+
+> Settlement harvested 4,812 units of wood during Year 38.
+
+But significant events should remain individually traceable.
+
+---
+
+# 4. WORLD
+
+Create a persistent simulated world containing:
+
+* Terrain
+* Water
+* Rivers/lakes/oceans where appropriate
+* Temperature
+* Rainfall
+* Seasons
+* Fertile land
+* Natural resources
+* Wildlife
+* Disease prevalence
+* Disaster risk
+* Climate trends
+* Resource deposits
+* Safe/unsafe areas
+
+The environment must matter.
+
+Civilizations should need to learn their environment rather than immediately possessing perfect knowledge.
+
+Early civilization behavior should include:
+
+* Exploration
+* Finding food
+* Finding water
+* Identifying safe locations
+* Learning terrain
+* Finding shelter
+* Learning seasons
+* Discovering resources
+* Learning dangerous plants/animals
+* Mapping surroundings
+
+---
+
+# 5. IMPERFECT INFORMATION
+
+The simulation itself knows the actual world state.
+
+Civilizations do NOT automatically know everything.
+
+Each civilization maintains its own world knowledge.
+
+For example:
+
+Actual military strength = 80
+
+Civilization B believes = 55
+
+This imperfect information should affect:
+
+* War
+* Diplomacy
+* Trade
+* Exploration
+* Migration
+* Strategic decisions
+* Risk assessment
+* Resource planning
+
+Allow:
+
+* Miscalculations
+* Surprise attacks
+* Intelligence failures
+* False confidence
+* Misinformation
+* Strategic deception
+* Failed diplomacy
+
+Do this efficiently without simulating every conversation.
+
+---
+
+# 6. POPULATION
+
+Population is a foundational system.
+
+Model:
+
+* Births
+* Deaths
+* Fertility
+* Age structure
+* Infant mortality
+* Life expectancy
+* Healthcare
+* Food
+* Disease
+* Living conditions
+* War casualties
+* Migration
+* Immigration
+* Emigration
+* Economic conditions
+* Education
+* Culture
+* Environment
+
+Use demographic aggregation for large populations while maintaining persistent individual identities.
+
+Population equation:
+
+BIRTHS + IMMIGRATION - DEATHS - EMIGRATION
+
+The system must support:
+
+* Villages
+* Towns
+* Cities
+* Large regional populations
+* 100,000+ populations
+* Potentially millions or more over sufficiently long runs
+
+Do not impose an artificial population ceiling.
+
+Resources should constrain growth naturally without making population growth impossible.
+
+---
+
+# 7. RESOURCE FEEDBACK LOOP
+
+Implement the missing foundational production system.
+
+Production must respond to:
+
+* Population
+* Labor
+* Technology
+* Infrastructure
+* Education
+* Tools
+* Available land
+* Natural resources
+* Organization
+* Energy
+
+Create positive development loops.
+
+Example:
+
+Population increases
+→ more workers
+→ more food production
+→ more infrastructure
+→ better extraction
+→ greater surplus
+→ better living conditions
+→ population growth
+
+Resources include:
+
+* Food
+* Fresh water
+* Wood
+* Stone
+* Metals
+* Fuel
+* Energy
+* Agricultural land
+* Construction materials
+* Luxury resources
+
+Scarcity should create pressure rather than immediately killing a civilization.
+
+Resource production must NOT simply use a fixed per-tile regeneration rate forever.
+
+---
+
+# 8. SURVIVAL INCENTIVES
+
+Agents must have reasons to settle and survive.
+
+Implement wilderness/solo-agent hazards.
+
+Agents outside settlements should face environmental risk influenced by:
+
+* Risk tolerance
+* Distance from known safety
+* Environment
+* Health
+* Recent hazard exposure
+* Resources
+* Weather
+* Knowledge
+
+Agents should learn from danger.
+
+Recent hazard experiences should influence future behavior.
+
+Do not create a hazard system that only kills agents.
+
+Danger must affect decisions.
+
+---
+
+# 9. SETTLEMENTS
+
+Settlements emerge from behavior.
+
+Progression can include:
+
+Temporary shelter
+→ Camps
+→ Villages
+→ Towns
+→ Cities
+→ Large urban centers
+
+Settlements should provide advantages such as:
+
+* Safety
+* Storage
+* Food coordination
+* Specialization
+* Trade
+* Infrastructure
+* Defense
+* Education
+* Government
+* Healthcare
+
+Fix settlement membership hysteresis.
+
+An agent temporarily moving outside a settlement's immediate cluster should NOT instantly abandon the settlement.
+
+Use a configurable grace period similar to settlement abandonment hysteresis.
+
+Only remove membership after sustained absence or a meaningful decision to leave.
+
+---
+
+# 10. INFRASTRUCTURE
+
+Implement:
+
+* Homes
+* Farms
+* Storage
+* Workshops
+* Roads
+* Defensive structures
+* Government buildings
+* Religious structures
+* Markets
+* Industrial facilities
+* Monuments
+* Historical landmarks
+
+Construction depends on:
+
+* Population
+* Labor
+* Materials
+* Technology
+* Organization
+* Resources
+* Economic surplus
+
+Construction can be:
+
+* Individual
+* Family
+* Cooperative
+* Institutional
+* Government-organized
+
+Infrastructure must improve civilization capabilities.
+
+---
+
+# 11. AGRICULTURE
+
+Implement progression from wild gathering to agriculture.
+
+Potential technologies:
+
+* Farming
+* Irrigation
+* Crop rotation
+* Animal domestication
+* Mechanization
+* Advanced agriculture
+
+Agriculture should emerge because environmental/economic circumstances make it useful.
+
+Do not simply unlock agriculture because the simulation reaches Year X.
+
+---
+
+# 12. ECONOMY
+
+Start with barter where appropriate.
+
+Then allow emergent development toward:
+
+* Currency
+* Markets
+* Specialization
+* Businesses
+* Supply chains
+* Trade networks
+* Economic institutions
+
+Economic systems should emerge from:
+
+* Population
+* Scarcity
+* Surplus
+* Specialization
+* Trade
+* Infrastructure
+* Trust
+* Institutions
+
+Businesses should be created by agents, not spawned arbitrarily.
+
+---
+
+# 13. LEARNING AND KNOWLEDGE
+
+Knowledge must be separate from technology.
+
+Track:
+
+* Individual knowledge
+* Cultural knowledge
+* Institutional knowledge
+* Technological capability
+* Practical infrastructure
+
+Agents learn from:
+
+* Personal experience
+* Other agents
+* Elders
+* Leaders
+* Teachers
+* Observation
+* Environment
+* Experiments
+* Success
+* Failure
+
+Knowledge spreads through populations.
+
+Knowledge can be lost.
+
+Education should emerge naturally when societies recognize that specialized knowledge is valuable.
+
+---
+
+# 14. TECHNOLOGY
+
+Implement a branching technology tree.
+
+Branches include:
+
+## Agriculture
+
+* Farming
+* Irrigation
+* Crop rotation
+* Animal domestication
+* Mechanization
+* Advanced agriculture
+
+## Construction
+
+* Basic shelters
+* Masonry
+* Roads
+* Large structures
+* Engineering
+* Advanced construction
+
+## Medicine
+
+* Herbal knowledge
+* Sanitation
+* Surgery
+* Vaccination
+* Antibiotics
+* Advanced medicine
+
+## Energy
+
+* Fire
+* Mechanical power
+* Steam
+* Electricity
+* Nuclear
+* Advanced energy
+
+## Computing
+
+* Writing
+* Mathematics
+* Mechanical computation
+* Electronics
+* Computers
+* Networking
+* AI
+
+Technology requires prerequisites and depends on:
+
+* Population
+* Education
+* Knowledge
+* Resources
+* Stability
+* Economic surplus
+* Institutions
+* Creativity
+* Cultural attitudes
+
+Technology must not be represented as one generic number.
+
+---
+
+# 15. TECHNOLOGY HISTORY
+
+Every significant technological discovery must record:
+
+* Technology
+* Date
+* Discoverer
+* Location
+* Civilization
+* Individuals involved
+* Previous knowledge
+* Previous technologies
+* Environmental pressure
+* Economic pressure
+* Why it was useful
+* How it spread
+* Social consequences
+* Economic consequences
+* Long-term consequences
+
+The system must be able to explain:
+
+> Why did this civilization develop this technology?
+
+not simply:
+
+> Technology increased from 42 to 43.
+
+---
+
+# 16. TECHNOLOGICAL REGRESSION
+
+Civilizations can lose technology.
+
+Causes include:
+
+* Loss of specialists
+* Loss of institutions
+* Loss of infrastructure
+* Loss of written knowledge
+* Reduced education
+* Population decline
+* Economic collapse
+* War
+* Disaster
+
+Knowledge may:
+
+* Survive elsewhere
+* Partially survive
+* Be forgotten
+* Be rediscovered centuries later
+
+---
+
+# 17. LAND OWNERSHIP
+
+Implement emergent land ownership.
+
+Land can be:
+
+* Unclaimed
+* Individually owned
+* Family owned
+* Community owned
+* Government controlled
+* Institutionally controlled
+* Contested
+
+Agents/civilizations may:
+
+* Claim
+* Sell
+* Trade
+* Inherit
+* Lose
+* Fight over
+* Settle land
+
+Ownership should emerge from:
+
+* Population density
+* Institutions
+* Economics
+* Culture
+* Government
+
+---
+
+# 18. GOVERNMENT
+
+Government must emerge rather than being automatically assigned.
+
+Possible systems:
+
+* Tribal leadership
+* Councils
+* Chiefdoms
+* Monarchies
+* Republics
+* Democracies
+* Authoritarian systems
+* Empires
+* Federations
+* Other emergent structures
+
+Track:
+
+* Centralization
+* Political participation
+* Institutional strength
+* Legitimacy
+* Corruption
+* State capacity
+* Stability
+* Enforcement capability
+
+Government can change through:
+
+* Economic crisis
+* War
+* Unrest
+* Leadership failure
+* Succession disputes
+* Popular movements
+* Reforms
+* Coups
+* Revolutions
+* External threats
+
+Record why every major government change occurred.
+
+---
+
+# 19. LEADERS AND HISTORICAL FIGURES
+
+Never pre-create “Alexander the Great.”
+
+Create conditions that could produce an Alexander-like figure.
+
+Agents have traits including:
+
+* Leadership
+* Intelligence
+* Education
+* Charisma
+* Military ability
+* Strategic thinking
+* Diplomacy
+* Ambition
+* Risk tolerance
+* Creativity
+* Discipline
+* Persuasiveness
+* Adaptability
+
+Historical importance should emerge from:
+
+* Personality
+* Circumstances
+* Opportunities
+* Relationships
+* Institutions
+* Conflict
+* Decisions
+* Successes/failures
+
+Track how each major historical figure became influential.
+
+---
+
+# 20. CULTURE
+
+Culture evolves through history.
+
+Track dimensions such as:
+
+* Family structure
+* Cooperation
+* Individualism
+* Militarism
+* Trade orientation
+* Risk tolerance
+* Education
+* Religious beliefs
+* Social hierarchy
+* Attitudes toward outsiders
+* Attitudes toward technology
+* Attitudes toward authority
+
+Culture influences behavior without completely determining it.
+
+Culture must itself be capable of changing.
+
+---
+
+# 21. RELIGION AND BELIEF
+
+Religion should emerge.
+
+Potential causes:
+
+* Fear
+* Death
+* Natural phenomena
+* Social cohesion
+* Leadership
+* Shared rituals
+* Extraordinary events
+* Disasters
+* Unexplained phenomena
+
+Different civilizations can interpret the same event differently.
+
+Track:
+
+* Belief origin
+* Belief spread
+* Religious leaders
+* Rituals
+* Conversion
+* Mutation
+* Religious conflict
+* Religious institutions
+
+Do not declare one interpretation objectively correct.
+
+---
+
+# 22. CRIME AND LAW
+
+As societies grow, allow emergence of:
+
+* Laws
+* Courts
+* Law enforcement
+* Prisons/restraints
+* Community enforcement
+* Gangs
+* Organized crime
+* Criminal organizations
+
+Crime can include:
+
+* Theft
+* Extortion
+* Territory control
+* Smuggling
+* Violence
+* Protection
+* Black-market activity
+
+Criminal groups should emerge from conditions rather than being automatically spawned.
+
+---
+
+# 23. QUALITY OF LIFE
+
+Track:
+
+* Food security
+* Shelter
+* Safety
+* Social connection
+* Recreation
+* Wealth
+* Health
+* Freedom
+* Community
+* Entertainment
+
+Agents should attempt to improve their lives.
+
+Civilizations can develop:
+
+* Festivals
+* Games
+* Music
+* Art
+* Recreation
+* Religious gatherings
+* Social institutions
+
+These should emerge from resources and culture.
+
+---
+
+# 24. DIPLOMACY
+
+Civilizations must remember relationships.
+
+Track:
+
+* Trust
+* Historical cooperation
+* Betrayal
+* Trade dependence
+* Cultural similarity
+* Territorial disputes
+* Military threat
+* Shared enemies
+* Past wars
+
+Support:
+
+* Alliances
+* Trade agreements
+* Treaties
+* Diplomatic missions
+* Defensive agreements
+* Rivalries
+* Betrayals
+* Peace agreements
+
+Relationships must evolve from history and current circumstances.
+
+---
+
+# 25. WAR
+
+Implement multiple levels of conflict.
+
+## Small-scale
+
+* Raids
+* Resource disputes
+* Border clashes
+* Local territorial conflicts
+
+## Large-scale
+
+* Organized armies
+* Campaigns
+* Sieges
+* Conquest
+* Civil wars
+* Imperial expansion
+
+Military decisions depend on:
+
+* Population
+* Food
+* Training
+* Equipment
+* Technology
+* Morale
+* Leadership
+* Logistics
+* Distance
+* Strategic objectives
+* Terrain
+* Alliances
+* Political stability
+
+Small civilizations should generally conduct appropriately scaled conflicts.
+
+Large organized civilizations can eventually conduct campaigns.
+
+Military superiority should never guarantee victory.
+
+---
+
+# 26. MILITARY DEVELOPMENT
+
+Military capability emerges from:
+
+* Population
+* Training
+* Equipment
+* Technology
+* Organization
+* Food
+* Economy
+* Leadership
+* Morale
+* Logistics
+* Infrastructure
+
+Include safety-in-numbers effects.
+
+Settlement membership should provide meaningful defensive benefits.
+
+Settlement defense should counterbalance settlement risks such as:
+
+* Disease
+* Raids
+* Crowding
+
+---
+
+# 27. DISEASE AND HEALTH
+
+Track:
+
+* Disease type
+* Origin
+* Location
+* Transmission
+* Affected population
+* Mortality
+* Recovery
+* Immunity
+* Resistance
+* Environment
+* Medical response
+* Mutation/adaptation
+* Social consequences
+* Economic consequences
+* Historical consequences
+
+Disease reporting should explain:
+
+* Why it emerged
+* Why it spread
+* Who was affected
+* What societies did
+* What changed afterward
+
+Disease must remain a meaningful environmental/social pressure without becoming an automatic civilization killer.
+
+---
+
+# 28. GENETIC ADAPTATION
+
+Over sufficiently long simulations, populations can develop inherited adaptations.
+
+Potential traits:
+
+* Disease resistance
+* Environmental tolerance
+* Altitude adaptation
+* Heat tolerance
+* Cold tolerance
+* Metabolic adaptations
+
+Adaptation must occur gradually over generations.
+
+Never implement instant upgrades.
+
+Keep the genetics model abstract and computationally cheap.
+
+---
+
+# 29. EXPLORATION AND MIGRATION
+
+Civilizations explore beyond their starting territory.
+
+They can:
+
+* Search for resources
+* Find food
+* Discover territory
+* Migrate
+* Establish settlements
+* Encounter civilizations
+* Trade
+* Fight
+* Exchange knowledge
+
+Exploration should be particularly important early in civilization development.
+
+---
+
+# 30. WORLD NAVIGATION
+
+Provide a world representation showing:
+
+* Terrain
+* Resources
+* Water
+* Settlements
+* Civilizations
+* Borders
+* Major events
+* Cities
+* Migration
+* Wars
+
+Civilization maps become more accurate as exploration increases.
+
+---
+
+# 31. BUSINESSES AND SUPPLY CHAINS
+
+The world should contain businesses, but businesses must be emergent.
+
+Agents can create:
+
+* Farms
+* Shops
+* Workshops
+* Mines
+* Trading companies
+* Manufacturers
+* Service businesses
+* Financial institutions
+* Transport organizations
+* Other economic organizations
+
+Businesses depend on:
+
+* Demand
+* Resources
+* Labor
+* Capital/wealth
+* Infrastructure
+* Markets
+* Technology
+* Transportation
+* Regulation
+* Competition
+
+Supply chains should emerge rather than being manually created.
+
+---
+
+# 32. HOUSING
+
+Housing emerges from population and construction.
+
+Track:
+
+* Available housing
+* Occupancy
+* Housing quality
+* Overcrowding
+* Wealth differences
+* Housing construction
+* Housing shortages
+
+Housing conditions affect:
+
+* Health
+* Happiness
+* Family formation
+* Migration
+* Crime
+* Social stability
+
+---
+
+# 33. ELECTIONS AND POLITICAL PARTICIPATION
+
+Where political systems support elections, implement emergent elections.
+
+Do not simulate every voter individually.
+
+Use aggregate voting models based on:
+
+* Demographics
+* Political beliefs
+* Economic conditions
+* Culture
+* Reputation
+* Leadership
+* Current events
+* Government performance
+* Information/perception
+
+Important political figures can be simulated individually.
+
+Election outcomes must still emerge from population behavior.
+
+---
+
+# 34. RANDOM EVENTS
+
+Implement seeded random events such as:
+
+* Weather events
+* Disasters
+* Resource discoveries
+* Disease outbreaks
+* Fires
+* Floods
+* Droughts
+* Earthquakes
+* Migration waves
+* Political crises
+* Social movements
+* Unusual environmental events
+* Other plausible events
+
+Randomness must be deterministic from the simulation seed.
+
+Do not use randomness as a substitute for simulation logic.
+
+---
+
+# 35. CAUSALITY ENGINE
+
+Every significant event should support causal relationships.
+
+Example:
+
+Drought
+→ crop failure
+→ food shortage
+→ prices increase
+→ unrest
+→ legitimacy falls
+→ leader loses support
+→ leader deposed
+
+Store causal relationships efficiently as a directed event graph.
+
+Users should eventually be able to ask:
+
+> Why did this happen?
+
+and trace the causal chain backward.
+
+Every major event should contain:
+
+* Timestamp
+* Event type
+* Location
+* Civilization
+* Agents
+* Cause
+* Immediate effects
+* Long-term effects
+* Related events
+* Confidence/uncertainty
+* Parent causes
+* Resulting events
+
+---
+
+# 36. EVENT LOGGING
+
+Every important event requires a globally unique deterministic ID.
+
+Avoid duplicate events.
+
+Agent IDs should be distinctive.
+
+Use a format such as:
+
+AGT-{generation}-{unique_id}
+
+Events should be classified by importance.
+
+Example levels:
+
+TRIVIAL
+MINOR
+SIGNIFICANT
+MAJOR
+HISTORICAL
+
+Only significant and above should normally enter the permanent detailed historical log.
+
+Aggregate minor events.
+
+This is essential for long-run performance.
+
+---
+
+# 37. CIVILIZATION STATE VECTOR
+
+Each civilization should maintain a compact state representation containing:
+
+* Population
+* Demographics
+* Economy
+* Technology
+* Military
+* Resources
+* Energy
+* Food
+* Government
+* Stability
+* Education
+* Health
+* Diplomacy
+* Territory
+* Infrastructure
+* Culture
+* Religion
+
+The state vector should make large-scale calculations efficient.
+
+Individual agents remain available where individual behavior matters.
+
+---
+
+# 38. CIVILIZATION LIFECYCLE
+
+The following progression must be possible but NEVER scripted:
+
+Survival
+→ exploration
+→ food gathering
+→ permanent settlement
+→ agriculture
+→ population growth
+→ specialization
+→ trade
+→ leadership
+→ institutions
+→ technology
+→ cities
+→ government
+→ military
+→ diplomacy
+→ culture
+→ large civilization
+→ potential empire
+→ decline/fragmentation/transformation/continuation
+
+A civilization can skip stages, regress, collapse, merge, split, migrate, or develop differently.
+
+---
+
+# 39. CIVILIZATION FAILURE
+
+Civilizations may fail.
+
+But failure should be a consequence, not the default outcome.
+
+Allow recovery from:
+
+* Famine
+* War
+* Disease
+* Disasters
+* Resource shortages
+* Political crises
+
+Civilizations may:
+
+* Recover
+* Rebuild
+* Adapt
+* Merge
+* Split
+* Migrate
+* Change government
+* Change culture
+* Collapse
+
+If extinction occurs, explain exactly why.
+
+---
+
+# 40. DIAGNOSTICS
+
+Build diagnostics into the simulation itself.
+
+Track:
+
+* Population growth
+* Birth rate
+* Death rate
+* Food production
+* Food consumption
+* Resource balance
+* Disease mortality
+* War frequency
+* Extinction rate
+* Technology progression
+* Migration
+* Settlement growth
+* Housing
+* Employment/labor
+* Economic production
+* Infrastructure
+* Education
+
+If a population collapses, automatically identify likely primary and secondary constraints.
+
+Example:
+
+Population Growth Diagnostic
+
+Birth rate: +2.1%
+Death rate: -2.0%
+Net growth: +0.1%
+
+Primary constraint:
+Food availability
+
+Secondary constraint:
+Infant mortality
+
+The diagnostic system should identify bottlenecks rather than requiring manual investigation.
+
+---
+
+# 41. RUN PERSISTENCE
+
+Every run must be exportable.
+
+Example:
+
+rundata_{run_id}.json
+
+The format should contain enough information to inspect/reconstruct a run.
+
+Store:
+
+* Seed
+* Configuration
+* Initial state
+* Simulation version
+* Periodic snapshots
+* Important events
+* Branches
+* God Mode interventions
+* Civilization histories
+* Important agent histories
+* Final state
+
+Do not store enormous redundant data unnecessarily.
+
+Use compression and snapshots intelligently.
+
+---
+
+# 42. LONG-RUN DATA MANAGEMENT
+
+The simulator must theoretically support hundreds or thousands of simulated years.
+
+Do not retain every microscopic intermediate action indefinitely.
+
+Use:
+
+* Snapshots
+* Event compression
+* Historical summaries
+* Important-event preservation
+* Aggregated statistics
+* Incremental persistence
+
+Historical detail should remain available where meaningful.
+
+---
+
+# 43. DETERMINISTIC SEEDS
+
+Every simulation has:
+
+* Seed
+* Initial state
+* Configuration
+* Simulation version
+
+The same combination must produce the same result.
+
+Example:
+
+Seed: 18472931
+
+Run A:
+No intervention
+
+Run B:
+Intervention at Year 100
+
+Branching must preserve deterministic behavior.
+
+---
+
+# 44. BRANCHING
+
+Implement timeline branching.
+
+Example:
+
+BASELINE
+2026 → 2030 → 2040 → 2050
+
+At 2030:
+
+BRANCH A
+Intervention
+→ alternate future
+
+BRANCH B
+No intervention
+→ alternate future
+
+Branches must preserve the original state at the branching point.
+
+Branches become independent afterward.
+
+Compare:
+
+* Population
+* Economy
+* Technology
+* Territory
+* Military
+* Events
+* Leaders
+* Civilizations
+* Cities
+* Disease
+* Government
+* Political systems
+
+Do not require population to differ in order for branches to count as different.
+
+Event-history divergence is sufficient.
+
+---
+
+# 45. GOD MODE
+
+God Mode is an experimental intervention system.
+
+Allow:
+
+* Add/remove resources
+* Modify environment
+* Introduce disease
+* Remove disease
+* Modify technology
+* Alter population
+* Change territory
+* Create resources
+* Trigger events
+* Influence weather
+* Create extraordinary events
+* Modify individual traits
+* Modify civilization traits
+
+Individual trait editing includes:
+
+* Leadership
+* Intelligence
+* Education
+* Strength
+* Health
+* Disease resistance
+* Charisma
+* Creativity
+* Military ability
+* Strategic ability
+* Diplomacy
+* Other traits
+
+Interventions may be:
+
+* Temporary
+* Permanent
+
+Every intervention MUST be logged in history with:
+
+* Timestamp
+* User action
+* Target
+* Previous state
+* New state
+* Reason/type
+* Branch
+
+God Mode must never silently modify history.
+
+---
+
+# 46. REAL-TIME MODE
+
+Support:
+
+## Batch mode
+
+Run rapidly and inspect results.
+
+## Live mode
+
+Continuously execute ticks while displaying the simulation.
+
+Controls:
+
+* Play
+* Pause
+* Step one tick
+* Step multiple ticks
+* Speed
+* Auto-run
+* Run X ticks
+* Run indefinitely
+* Stop when civilizations die
+* Save state
+* Create branch
+
+Internally remain discrete tick-based.
+
+A tick may represent a configurable:
+
+* Month
+* Year
+* Other simulation period
+
+Do not tie rendering frequency to simulation frequency.
+
+The simulation engine must be able to run independently of the UI.
+
+---
+
+# 47. OBSERVER DASHBOARD
+
+Build a real dashboard that only exposes functionality that actually exists.
+
+## World
+
+Show:
+
+* Current year
+* Current tick
+* World population
+* Civilization count
+* Settlement count
+* Major events
+
+## Civilizations
+
+Show:
+
+* Civilization list
+* Population
+* Technology
+* Economy
+* Territory
+* Military
+* Stability
+* Government
+* Culture
+* Health
+* Education
+
+## Events
+
+Show:
+
+* Live event stream
+* Filters
+* Event details
+* Causal chains
+
+## Technology
+
+Show:
+
+* Technology tree
+* Discoveries
+* Inventors
+* Technology spread
+* Regression
+
+## Population
+
+Show:
+
+* Demographics
+* Births
+* Deaths
+* Migration
+* Health
+
+## Map
+
+Show:
+
+* World state
+* Civilizations
+* Settlements
+* Borders
+* Cities
+* Resources
+* Migration
+* Wars
+* Events
+
+## God Mode
+
+Show intervention controls.
+
+## Branching
+
+Show:
+
+* Create branch
+* Compare timelines
+
+## Run Inspector
+
+Show:
+
+* Historical replay
+* Event history
+* Civilization histories
+* Agent histories
+
+---
+
+# 48. CIVILIZATION PROFILES
+
+Each civilization gets a detailed profile.
+
+Show:
+
+* Population
+* Demographics
+* Economy
+* Technology
+* Military
+* Government
+* Culture
+* Religion
+* Health
+* Education
+* Territory
+* Cities
+* Infrastructure
+* Resources
+* Leaders
+* Alliances
+* Enemies
+* Historical events
+* Current problems
+* Long-term trends
+
+Most importantly:
+
+Explain WHY the civilization is doing what it is doing.
+
+---
+
+# 49. AGENT INSPECTOR
+
+The user must be able to select any persistent individual.
+
+Display:
+
+* Identity
+* Generation
+* Age
+* Sex
+* Health
+* Personality
+* Intelligence
+* Wealth
+* Job
+* Needs
+* Family
+* Relationships
+* Political beliefs
+* Memory
+* Goals
+* Reputation
+* Beliefs
+* Knowledge
+* Inventory
+* Location
+* Civilization
+* Settlement
+* Career
+* Major events
+* Life history
+* Current simulation resolution
+
+Allow historical replay of important agents.
+
+If an agent dies, show:
+
+* Date
+* Location
+* Cause
+* Circumstances
+* Related events
+
+Possible statuses:
+
+* Alive
+* Dead
+* Missing
+* Migrated
+* Imprisoned
+* Exiled
+* Retired
+* Unknown due to genuine information loss
+
+Never use “Unknown” as a substitute for missing implementation.
+
+---
+
+# 50. WORLD MAP
+
+Implement a live world map where practical.
+
+Visualize:
+
+* Terrain
+* Water
+* Resources
+* Civilizations
+* Settlements
+* Cities
+* Borders
+* Population
+* Migration
+* Wars
+* Major events
+
+The map is an observer layer.
+
+Never allow visualization complexity to damage simulation performance.
+
+If necessary, start with a lightweight map renderer.
+
+---
+
+# 51. EMERGENT BUSINESS / GOVERNMENT / HOUSING / CRIME / MARKETS
+
+The world must eventually contain:
+
+* Businesses
+* Government
+* Housing
+* Crime
+* Markets
+* Wars
+* Elections
+* Supply chains
+* Random events
+
+CRITICAL:
+
+These systems must be generated by agent/civilization behavior.
+
+Do NOT simply create:
+
+“10 businesses every 100 years.”
+
+Instead create incentives and rules that cause agents to create them.
+
+Examples:
+
+High demand + available capital + skilled worker
+→ business formation
+
+Population density + housing demand
+→ construction
+
+Crime pressure + political organization
+→ law enforcement
+
+Trade volume + specialization
+→ markets
+
+Political participation + suitable government
+→ elections
+
+Supply/demand + infrastructure
+→ supply chains
+
+---
+
+# 52. EMERGENT BEHAVIOR PRINCIPLE
+
+Never hardcode:
+
+* Civilization X becomes an empire
+* Agent X becomes a great leader
+* Technology X appears in Year 100
+* Civilization Y declares war in Year 200
+* Government automatically changes
+* City automatically forms after population reaches N
+
+Instead define:
+
+* Incentives
+* Constraints
+* Probabilities
+* Prerequisites
+* Information
+* Personality
+* Culture
+* Resources
+* Institutions
+* Feedback loops
+
+Then allow outcomes to emerge.
+
+---
+
+# 53. OBSERVABILITY REQUIREMENT
+
+Every important system must expose enough internal state to diagnose it.
+
+Avoid black-box mechanics.
+
+For important decisions, retain compact explanations such as:
+
+Decision:
+
+Remain in settlement
+
+Factors:
+
+Food security: +0.8
+Safety: +0.7
+Family: +0.6
+Curiosity: -0.3
+Recent hazard: +0.4
+
+Result:
+
+Stayed
+
+Do not log every calculation permanently.
+
+Only retain detailed decision traces for:
+
+* High-resolution agents
+* Important events
+* Debug mode
+* Recently relevant decisions
+
+---
+
+# 54. PERFORMANCE MODEL
+
+Design the engine so that computational cost scales primarily with:
+
+* Number of active/high-resolution agents
+* Number of civilizations
+* Number of settlements
+* Number of important events
+
+NOT simply total population.
+
+A civilization containing 10 million people should not require 10 million complicated AI decision cycles every tick.
+
+Use aggregate calculations for:
+
+* Demographics
+* General economic activity
+* Disease spread
+* Basic labor
+* Births
+* Deaths
+* Consumption
+* Production
+
+Use individual simulation for:
+
+* Leaders
+* Inventors
+* Soldiers
+* Criminals
+* Political figures
+* Explorers
+* Important agents
+* Agents involved in important events
+
+---
+
+# 55. AI RESOURCE EFFICIENCY
+
+Do NOT use a generative AI model for ordinary simulation decisions.
+
+The simulation itself should be deterministic mathematical/programmatic logic.
+
+Do not call an LLM for:
+
+* Every agent decision
+* Every trade
+* Every movement
+* Every birth
+* Every death
+* Every resource calculation
+* Every political vote
+* Every combat calculation
+
+Use normal code, probability distributions, utility scoring, state machines, rules, and mathematical models.
+
+AI/LLM assistance should only be used optionally for high-level tasks such as:
+
+* Natural-language historical summaries
+* Explaining causal chains
+* Generating readable reports
+* Conversational queries about the simulation
+* Turning structured history into narrative
+
+Cache generated explanations.
+
+Never require an LLM for the simulation to function.
+
+The simulator must operate fully offline without an AI API.
+
+---
+
+# 56. LLM REPORTING LAYER
+
+If an AI explanation layer is included, feed it structured data rather than raw logs.
+
+Example:
+
+Instead of sending 50,000 events to an LLM, provide:
+
+* Civilization state
+* Important events
+* Causal graph
+* Relevant individuals
+* Trends
+* Before/after state
+
+Then generate:
+
+> Civilization X developed irrigation after repeated seasonal food shortages. An inventor noticed...
+
+Cache the result by:
+
+* Run ID
+* Civilization
+* Time period
+* Event set hash
+
+Do not repeatedly regenerate identical explanations.
+
+---
+
+# 57. SIMULATION ENGINE ARCHITECTURE
+
+Separate the application into independent modules.
+
+Recommended architecture:
+
+WORLD
+├── Environment
+├── Terrain
+├── Resources
+├── Climate
+├── Wildlife
+└── Disasters
+
+SIMULATION
+├── Tick engine
+├── Scheduler
+├── Random seed
+├── Resolution manager
+├── State manager
+└── Branch manager
+
+POPULATION
+├── Demographics
+├── Birth
+├── Death
+├── Aging
+├── Migration
+├── Cohort aggregation
+└── Individual agents
+
+AGENTS
+├── Personality
+├── Needs
+├── Goals
+├── Relationships
+├── Knowledge
+├── Memory
+├── Occupations
+└── Decision engine
+
+CIVILIZATIONS
+├── Economy
+├── Culture
+├── Religion
+├── Government
+├── Diplomacy
+├── Military
+├── Territory
+└── Institutions
+
+SETTLEMENTS
+├── Population
+├── Housing
+├── Buildings
+├── Infrastructure
+├── Production
+└── Defense
+
+TECHNOLOGY
+├── Knowledge
+├── Tech tree
+├── Discovery
+├── Spread
+└── Regression
+
+HEALTH
+├── Disease
+├── Healthcare
+├── Immunity
+└── Genetics
+
+HISTORY
+├── Events
+├── Causality
+├── Historical figures
+├── Memories
+└── Reports
+
+PERSISTENCE
+├── Snapshots
+├── Run files
+├── Event storage
+└── Branches
+
+OBSERVER
+├── Dashboard
+├── Map
+├── Civilization inspector
+├── Agent inspector
+├── Event inspector
+├── Diagnostics
+└── God Mode
+
+---
+
+# 58. TESTING REQUIREMENTS
+
+Do not declare the project complete because the UI renders.
+
+Create automated tests for:
+
+* Population math
+* Birth/death reconciliation
+* Aging
+* Migration
+* Settlement membership
+* Membership hysteresis
+* Wilderness hazards
+* Resource production
+* Resource consumption
+* Technology prerequisites
+* Technology discovery
+* Technology regression
+* Disease transmission
+* Disease recovery
+* Government transitions
+* Leadership
+* Elections
+* Diplomacy
+* War
+* Land ownership
+* Construction
+* Branching
+* Deterministic seeds
+* Save/load
+* Event uniqueness
+* Causal chains
+* Agent promotion/demotion
+* Resolution transitions
+* God Mode audit logging
+
+---
+
+# 59. DETERMINISM TEST
+
+This is mandatory.
+
+Run the same simulation twice with:
+
+* Same seed
+* Same initial world
+* Same configuration
+* Same simulation version
+
+The resulting important state/history must be identical.
+
+Then branch from the same point and verify that:
+
+* The original remains unchanged
+* The branch is independent
+* Identical future inputs produce deterministic results
+
+---
+
+# 60. STRESS TESTS
+
+Test populations such as:
+
+* 100
+* 1,000
+* 10,000
+* 100,000
+* 1,000,000+
+* Larger theoretical populations where practical
+
+Measure:
+
+* Tick duration
+* Memory usage
+* Event volume
+* Active agent count
+* High-resolution agent count
+* Snapshot size
+
+The system should demonstrate that total population does not equal total expensive simulation work.
+
+---
+
+# 61. BUG FIXES FROM THE EXISTING SYSTEM
+
+Preserve and improve existing working functionality where possible.
+
+Fix these known issues:
+
+## Settlement membership churn
+
+Current behavior clears settlement membership immediately when an agent leaves the current member tile cluster.
+
+Implement grace/hysteresis so normal wandering does not cause:
+
+> left_settlement
+
+for a leader or ordinary member.
+
+## Wilderness hazard
+
+Wilderness hazard must affect behavior as well as mortality.
+
+Agents should learn that being outside safe settlements is dangerous.
+
+## Safety in numbers
+
+Settlement membership should provide meaningful defensive benefits.
+
+## SQLite/event accumulation
+
+Prevent exported event history from accumulating previous runs when a fresh run database is intended.
+
+Never duplicate event history simply because the simulation was run again.
+
+## Technology interpretation
+
+Do not incorrectly treat repeated discovery attempts as distinct technologies.
+
+Technology identity must be based on unique technology IDs.
+
+---
+
+# 62. DIAGNOSTIC PRIORITY
+
+When something goes wrong, the system should answer:
+
+1. What happened?
+2. Why did it happen?
+3. What caused it?
+4. Which system was the bottleneck?
+5. Which individuals/civilizations were involved?
+6. What changed afterward?
+
+For example:
+
+Civilization extinction
+
+Cause:
+Food shortage
+
+Primary contributor:
+Agricultural productivity insufficient for population
+
+Secondary contributor:
+Infant mortality
+
+Contributing event:
+Three consecutive drought seasons
+
+Political consequence:
+Leader legitimacy declined
+
+Final event:
+Civilization fragmented into three successor settlements
+
+This is far more important than merely reporting:
+
+> Population reached zero.
+
+---
+
+# 63. REPORTING
+
+Generate detailed reports capable of explaining:
+
+* What happened
+* When
+* Who
+* Where
+* Why
+* Causes
+* Immediate consequences
+* Long-term consequences
+* What happened afterward
+
+Example style:
+
+“Civilization X developed irrigation after repeated seasonal food shortages. An inventor discovered the technique after observing water movement near the settlement. The resulting increase in agricultural productivity improved food security and contributed to population growth.”
+
+The underlying simulation must contain structured evidence supporting the explanation.
+
+Do not fabricate explanations that are unsupported by simulation history.
+
+---
+
+# 64. FINAL SUCCESS CRITERIA
+
+The project is successful when it can produce emergent stories such as:
+
+* A tiny settlement becoming a major city
+* A village becoming an empire
+* A resource-rich civilization becoming technologically dominant
+* An ordinary person becoming a historically important leader
+* A civilization collapsing from environmental disaster
+* A forgotten technology being rediscovered centuries later
+* Generations of enemies eventually becoming allies
+* A criminal organization becoming politically powerful
+* A migration creating a new civilization
+* A religious movement spreading after an extraordinary event
+* A smaller civilization defeating a larger empire through strategy
+* A city becoming the dominant economic center of a region
+* A civilization splitting into successor states
+* Businesses and markets emerging
+* Governments emerging
+* Elections emerging where appropriate
+* Supply chains emerging
+* Housing systems emerging
+* Law enforcement emerging
+* Cultural identities changing
+* Technologies regressing
+* Civilizations recovering from disaster
+
+None of these outcomes should be scripted.
+
+---
+
+# 65. DEVELOPMENT ORDER
+
+Do NOT implement everything simultaneously.
+
+Build in dependency order.
+
+## PHASE 1 — FOUNDATION
+
+1. Stabilize simulation engine
+2. Deterministic seeds
+3. Persistent world state
+4. Agent identity
+5. Adaptive-resolution architecture
+6. Population system
+7. Demographics
+8. Resource production/consumption
+9. Food system
+10. Health
+11. Disease
+12. Environment
+13. Settlement hysteresis
+14. Wilderness hazard
+15. Diagnostics
+
+Acceptance test:
+
+A small founding population can survive, grow, settle, and under favorable conditions eventually reach approximately 100,000+ population without an artificial population cap.
+
+---
+
+## PHASE 2 — DEVELOPMENT
+
+1. Learning
+2. Knowledge
+3. Technology tree
+4. Agriculture
+5. Infrastructure
+6. Construction
+7. Housing
+8. Economy
+9. Specialization
+10. Markets
+11. Businesses
+12. Supply chains
+13. Exploration
+14. Migration
+
+---
+
+## PHASE 3 — SOCIAL SYSTEMS
+
+1. Leadership
+2. Government
+3. Institutions
+4. Culture
+5. Religion
+6. Crime
+7. Law enforcement
+8. Political beliefs
+9. Elections
+10. Diplomacy
+11. Alliances
+12. Trade agreements
+
+---
+
+## PHASE 4 — HISTORY
+
+1. Military improvements
+2. Large-scale war
+3. Historical figures
+4. Civilization memory
+5. Imperfect information
+6. Genetic adaptation
+7. Technological regression
+8. Major disasters
+9. Causal graph
+10. Historical reports
+
+---
+
+## PHASE 5 — OBSERVABILITY
+
+1. Real-time mode
+2. Live map
+3. Civilization profiles
+4. Agent inspector
+5. Event inspector
+6. Causal-chain viewer
+7. God Mode
+8. Branching
+9. Run comparison
+10. Historical replay
+11. Diagnostics dashboard
+12. Rich reports
+
+---
+
+# 66. IMPLEMENTATION RULES
+
+When implementing:
+
+1. Inspect the existing codebase before rewriting it.
+2. Preserve working functionality.
+3. Do not rewrite stable systems unnecessarily.
+4. Do not create duplicate systems.
+5. Refactor only where it improves architecture.
+6. Keep modules loosely coupled.
+7. Use interfaces/contracts between systems.
+8. Avoid global state where possible.
+9. Make configuration data-driven.
+10. Make constants configurable.
+11. Make simulation behavior testable.
+12. Make randomness deterministic.
+13. Keep UI separate from simulation logic.
+14. Keep persistence separate from simulation logic.
+15. Never require an external AI API for core simulation.
+16. Never hide failed implementation behind UI placeholders.
+17. Never claim a feature works until it is actually implemented and tested.
+18. Add tests as features are added.
+19. Prefer simple deterministic algorithms over expensive AI calls.
+20. Optimize only after correctness, but design for scalability from the beginning.
+
+---
+
+# 67. MOST IMPORTANT DESIGN PRINCIPLE
+
+The simulator is not supposed to simulate every microscopic human action.
+
+It is supposed to simulate the SYSTEMS that make billions of humans possible.
+
+Every human remains a persistent individual.
+
+Computational resolution determines how deeply that human is simulated at a given moment.
+
+This distinction is fundamental.
+
+Do not sacrifice individual identity merely to gain performance.
+
+Do not sacrifice performance by deeply simulating every individual every tick.
+
+Use adaptive resolution to achieve both.
+
+---
+
+# 68. FINAL INSTRUCTION TO THE BUILDING AI
+
+Build this as a real production-quality simulation platform.
+
+Do not stop after creating the interface.
+
+Do not create fake buttons.
+
+Do not use placeholder arrays where actual systems are required.
+
+Do not hardcode civilization outcomes.
+
+Do not use LLM calls for ordinary agent decisions.
+
+Do not remove individual agents to improve performance.
+
+Do not sacrifice determinism.
+
+Do not sacrifice explainability.
+
+Do not implement all systems as independent random number generators.
+
+Systems must interact.
+
+Population must affect labor.
+
+Labor must affect production.
+
+Production must affect resources.
+
+Resources must affect health and growth.
+
+Health must affect population.
+
+Population must affect settlements.
+
+Settlements must affect safety and production.
+
+Production must affect technology and infrastructure.
+
+Technology must affect productivity.
+
+Infrastructure must affect civilization capability.
+
+Civilization capability must affect government, military, economy, and society.
+
+Culture must affect behavior.
+
+History must affect future behavior.
+
+Memory must affect diplomacy.
+
+Knowledge must affect technology.
+
+Environment must affect civilization.
+
+Civilization must alter its environment.
+
+Individuals must affect civilization.
+
+Civilization must affect individuals.
+
+The resulting feedback loops should create emergent history.
+
+Build the foundation first, test it, diagnose it, then expand.
+
+The ultimate objective is a persistent simulated world where the observer can create a world, let civilizations develop, watch individuals rise and fall, intervene, branch timelines, inspect causes, and discover histories that were never explicitly programmed.

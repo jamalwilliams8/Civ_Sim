@@ -1,0 +1,26 @@
+Current state (verified by running it):
+
+Engine, deterministic seeded RNG, world grid, agent registry, births/aging/death, food consumption, and the resource-production feedback loop (labor → tile capacity) are all working.
+50 ticks: 20 → 79 living, 0 dead — matches your "0 dead 50 ticks" note.
+I also ran it out to 500 ticks to sanity-check the crowding fix holds longer-term: population settles into a stable band (57 living, deaths split 397 old_age / 213 starvation) instead of collapsing to zero. The fix is solid.
+
+What's still missing from Phase 1 (per your own roadmap doc):
+
+No settlements at all yet — agents just wander tile to tile. This means the "settlement hysteresis" bug fix in your notes isn't applicable yet; there's nothing to have hysteresis on.
+No wilderness hazard system (only starvation/old-age kill agents right now).
+No disease.
+Resolution is defined (Resolution.LOW/MEDIUM/HIGH) but nothing ever promotes/demotes an agent — every agent just sits at LOW forever.
+Diagnostics reports raw numbers but doesn't identify bottlenecks yet (section 40's "primary constraint / secondary constraint" style output).
+
+Land capacity is currently capped low (LAND_CAPACITY_CEILING = 40 per tile, 10x10 world), which is why population is topping out in the 50s-60s — expected for this stage, not a bug.
+
+
+
+
+Settlements. Here's why it beats the others as the next move:
+
+It's a prerequisite for two things already flagged as known bugs in your notes (settlement hysteresis, safety-in-numbers) — building those fixes now would be fixing something that doesn't exist yet.
+Wilderness hazard is much more meaningful once there's an "outside a settlement" to be a hazard relative to — right now every tile is equivalent, so a hazard system would just be uniform extra death, not the "learn that wandering is dangerous" behavior your spec wants.
+Resolution promotion needs triggers like "became a local leader" or "joined a settlement's council" — most of the promotion triggers in your spec assume settlements exist.
+Bottleneck diagnostics get much more useful once there's a settlement layer to diagnose (e.g. "settlement X collapsed because Y"), rather than just a flat tile grid.
+
