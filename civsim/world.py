@@ -30,10 +30,10 @@ class World:
             for y in range(height):
                 self.tiles[(x, y)] = Tile(
                     x=x, y=y,
-                    max_food=10.0,
-                    food_wild=10.0,
+                    max_food=15.0,        # Raised from 10.0 to give early tribes a survival buffer
+                    food_wild=15.0,
                     soil_health=1.0,
-                    regen_rate=0.4
+                    regen_rate=0.6        # Scaled up slightly to sustain early population growth
                 )
 
     def get_tile(self, x: int, y: int) -> Tile:
@@ -41,7 +41,7 @@ class World:
 
     def tick_ecosystem(self, agents_registry) -> None:
         """Processes environment changes, climate trends, and soil load carrying capacities."""
-        # 1. Update Cyclical Weather Patterns
+        # 1. Update Cyclical Weather Patterns (10% chance to shift climate states)
         if random.random() < 0.10:
             self.current_weather = random.choice(WEATHER_TYPES)
 
@@ -57,9 +57,10 @@ class World:
         # Apply climate multipliers
         weather_modifier = 1.0
         if self.current_weather == "DROUGHT":
-            weather_modifier = 0.25  # Famine condition
+            weather_modifier = 0.30  
         elif self.current_weather == "FREEZE":
-            weather_modifier = 0.00  # Starvation risk layer
+            # FIX: Tuned from 0.00 to 0.10 so winters create severe famine without instant mechanical extinction
+            weather_modifier = 0.10  
 
         for pos, tile in self.tiles.items():
             load = occupancy.get(pos, 0)
@@ -77,4 +78,4 @@ class World:
 
             # Population extraction depletion
             if load > 0:
-                tile.food_wild = max(0.0, tile.food_wild - (load * 0.15))
+                tile.food_wild = max(0.0, tile.food_wild - (load * 0.12))
