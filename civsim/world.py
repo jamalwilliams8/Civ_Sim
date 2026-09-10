@@ -1,7 +1,7 @@
 ﻿"""
 civsim/world.py
 Persistent environment map: tracks tile-by-tile wild resources, soil health degradation vectors, 
-and global cyclical Weather/Climate patterns.
+and global cyclical Weather/Climate patterns with an embedded early historical grace era.
 """
 
 import random
@@ -30,10 +30,10 @@ class World:
             for y in range(height):
                 self.tiles[(x, y)] = Tile(
                     x=x, y=y,
-                    max_food=15.0,        # Raised from 10.0 to give early tribes a survival buffer
-                    food_wild=15.0,
+                    max_food=25.0,        # Raised to give early hunter-gatherers a healthy starting runway
+                    food_wild=25.0,
                     soil_health=1.0,
-                    regen_rate=0.6        # Scaled up slightly to sustain early population growth
+                    regen_rate=0.7        # Safe baseline recovery rate
                 )
 
     def get_tile(self, x: int, y: int) -> Tile:
@@ -41,9 +41,16 @@ class World:
 
     def tick_ecosystem(self, agents_registry) -> None:
         """Processes environment changes, climate trends, and soil load carrying capacities."""
-        # 1. Update Cyclical Weather Patterns (10% chance to shift climate states)
-        if random.random() < 0.10:
-            self.current_weather = random.choice(WEATHER_TYPES)
+        current_tick = getattr(agents_registry, "current_tick", 200) # Safe fallback padding
+        
+        # 1. Update Weather Cycle with an Initial Historical Grace Era
+        # To maintain realism, lock the climate out of droughts/freezes for the first 150 years
+        if current_tick < 150:
+            if random.random() < 0.10:
+                self.current_weather = random.choice(["NORMAL", "WET"])
+        else:
+            if random.random() < 0.10:
+                self.current_weather = random.choice(WEATHER_TYPES)
 
         # 2. Compute resource depletion and consumption impacts per cell
         occupancy = {}
@@ -59,7 +66,6 @@ class World:
         if self.current_weather == "DROUGHT":
             weather_modifier = 0.30  
         elif self.current_weather == "FREEZE":
-            # FIX: Tuned from 0.00 to 0.10 so winters create severe famine without instant mechanical extinction
             weather_modifier = 0.10  
 
         for pos, tile in self.tiles.items():
@@ -78,4 +84,4 @@ class World:
 
             # Population extraction depletion
             if load > 0:
-                tile.food_wild = max(0.0, tile.food_wild - (load * 0.12))
+                tile.food_wild = max(0.0, tile.food_wild - (load * 0.10))
