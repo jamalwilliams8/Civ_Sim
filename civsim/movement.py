@@ -1,7 +1,7 @@
 ﻿"""
 civsim/movement.py
 Agent behavior: Integrated Adaptive Resolution Management.
-Optimized to parse regional tundra climate boundaries and enforce hazard migration memory.
+Optimized to integrate housing quality insulation and technology-gated clothing shields.
 """
 
 from collections import defaultdict
@@ -12,8 +12,8 @@ SEARCH_RADIUS = 2
 MAX_ALLOWED_HIGH_RES_INDIVIDUALS = 100  
 
 
-def resolve_movement(world: World, agents: AgentRegistry) -> None:
-    """Executes pathfinding steps utilizing regional safety and hazard memory weights."""
+def resolve_movement(world: World, agents: AgentRegistry, tech_registry=None) -> None:
+    """Executes pathfinding steps utilizing tech-gated clothing and housing insulation shields."""
     all_raw_living = agents.raw_living_agents()
     
     # Enforce performance throttle ceiling
@@ -36,12 +36,12 @@ def resolve_movement(world: World, agents: AgentRegistry) -> None:
     for pos, agents_on_tile in grid_buckets.items():
         if len(agents_on_tile) >= 3:  
             if pos not in agents.cohorts:
-                lead_agent = agents_on_tile[0]
+                lead_agent = agents_on_tile
                 s_id = getattr(lead_agent, "settlement_id", None)
                 gen = getattr(lead_agent, "generation", 0)
                 
                 agents.cohorts[pos] = DemographicCohort(
-                    x=pos[0], y=pos[1], generation=gen, settlement_id=s_id
+                    x=pos, y=pos, generation=gen, settlement_id=s_id
                 )
             
             cohort = agents.cohorts[pos]
@@ -73,10 +73,27 @@ def resolve_movement(world: World, agents: AgentRegistry) -> None:
         danger_memory = getattr(agent, "hazard_experience", 0.0)
         local_occupants = occupancy.get(origin_pos, 1)
         
-        # Incremental Spatial Learning: Update hazard memory dynamically if stuck in the cold tundra
+        # Check technological shield flags
+        has_warm_clothing = False
+        if agent.settlement_id and tech_registry is not None:
+            tech_state = tech_registry.get_state(agent.settlement_id)
+            if "Warm Clothing" in tech_state.unlocked_techs:
+                has_warm_clothing = True
+
+        # Check infrastructure insulation shield flags
+        # Better housing quality scales down exposure damage proportionally inside city clusters
+        housing_insulation = getattr(agent, "housing_quality", 1.0)
+        insulation_multiplier = max(0.1, 1.0 - (housing_insulation * 0.15))
+
+        # Incremental Spatial Learning: Process tundra exposure damage
         if current_tile.zone_type == "TUNDRA" and world.northern_weather == "FREEZE":
-            agent.hazard_experience += 0.5
-            agent.health = max(1.0, agent.health - 1.0) # Apply cold damage exposure
+            if not has_warm_clothing:
+                agent.hazard_experience += 0.5
+                # Cold damage is mitigated by how well built the local stone housing is
+                exposure_damage = 1.0 * insulation_multiplier
+                agent.health = max(1.0, agent.health - exposure_damage)
+            else:
+                agent.hazard_experience = max(0.0, danger_memory - 0.2)
 
         if (current_tile.food_wild / max(1, local_occupants)) >= FOOD_NEED_PER_TICK and danger_memory < 2.0:
             continue  
@@ -96,11 +113,9 @@ def resolve_movement(world: World, agents: AgentRegistry) -> None:
                 target_pos = (nx, ny)
                 tile = world.get_tile(nx, ny)
                 
-                # REGIONAL LEARNING FEEDBACK: If agent has survived cold tundra trauma,
-                # apply a major penalty to northern steps to force them to migrate south.
                 regional_preference = 1.0
-                if tile.zone_type == "TUNDRA" and danger_memory > 1.0:
-                    regional_preference = 0.05 # Aggressively avoid northern tundra tiles
+                if tile.zone_type == "TUNDRA" and danger_memory > 1.0 and not has_warm_clothing:
+                    regional_preference = 0.05 
 
                 food_share = (tile.food_wild / (occupancy.get(target_pos, 0) + 1)) * regional_preference
                 if food_share >= FOOD_NEED_PER_TICK and food_share > best_food:
@@ -109,9 +124,8 @@ def resolve_movement(world: World, agents: AgentRegistry) -> None:
 
         if best_target is None:
             h = agent.id.__hash__()
+            dy = 1 if (danger_memory > 1.0 and not has_warm_clothing) else ((h // 3) % 3) - 1
             dx = (h % 3) - 1
-            # Learn to prefer heading south (+1) if traumatized by the tundra freeze
-            dy = 1 if danger_memory > 1.0 else ((h // 3) % 3) - 1
             tx = min(max(cx + dx, 0), world.width - 1)
             ty = min(max(cy + dy, 0), world.height - 1)
             best_target = (tx, ty)
