@@ -1,26 +1,36 @@
-"""
+﻿"""
+civsim/settlements.py
 Settlements: persistent group affiliations that emerge from sustained
-population density, with hysteresis so ordinary wandering doesn't
-instantly strip membership.
-
-OPTIMIZATION & REPAIR: 
-1. Replaced the O(N^2) nested loop density check with a spatial grid counter,
-   improving performance by magnitudes for high agent counts.
-2. Added an Abandonment / Collapse phase. If a settlement's population drops
-   to zero and stays empty, it is marked as a ruins/abandoned, preventing
-   "ghost towns" from passing down unearned starvation buffers to strangers.
+population density, with immersive random naming and tribal leadership seats.
 """
 
+import random
 from dataclasses import dataclass, field
 from itertools import count
 from collections import defaultdict
-from civsim.agents import AgentRegistry
+from civsim.agents import AgentRegistry, Resolution
 
-SETTLEMENT_RADIUS = 2          # Chebyshev distance counted as "in" the settlement
-FOUNDING_MIN_POPULATION = 6    # unaffiliated agents required in radius to start a streak
-FOUNDING_MIN_DURATION = 10     # consecutive ticks the density must hold before founding
-ABANDONMENT_GRACE_TICKS = 5    # ticks a member may be absent before losing membership
-MAX_SETTLEMENT_VACANCY_TICKS = 20 # How long a settlement can stay completely empty before collapsing
+SETTLEMENT_RADIUS = 2          
+FOUNDING_MIN_POPULATION = 6    
+FOUNDING_MIN_DURATION = 10     
+ABANDONMENT_GRACE_TICKS = 5    
+MAX_SETTLEMENT_VACANCY_TICKS = 20 
+
+# EXPANDED LIBRARY: A vast collection of thematic prefixes and suffixes to fuel thousands of unique combinations
+PREFIXES = [
+    "Oak", "Ember", "River", "Dawn", "Shadow", "Stone", "Iron", "Storm", "Silver", "Winter", 
+    "Clay", "Moss", "Ash", "Black", "Gold", "Frost", "Thorn", "Wild", "Mist", "Flint", 
+    "Raven", "Wolf", "Deer", "Bear", "Hawk", "Pine", "Elder", "Cedar", "Gale", "Brook", 
+    "Amber", "Copper", "Dusk", "Bright", "Cold", "Grim", "High", "Low", "North", "South", 
+    "East", "West", "Red", "Blue", "Green", "White", "Heath", "Fen", "Moor", "Crag"
+]
+
+SUFFIXES = [
+    "haven", "fall", "bend", "reach", "crest", "hold", "wood", "crag", "vale", "shore", 
+    "ridge", "brook", "glen", "ford", "mill", "rock", "peak", "wood", "field", "dale", 
+    "marsh", "moor", "spring", "well", "port", "gate", "keep", "tower", "fort", "burgh", 
+    "ton", "ham", "stead", "shire", "holt", "thwaite", "hurst", "den", "comb", "cote"
+]
 
 
 def _within_radius(x: int, y: int, cx: int, cy: int, r: int) -> bool:
@@ -30,13 +40,15 @@ def _within_radius(x: int, y: int, cx: int, cy: int, r: int) -> bool:
 @dataclass
 class Settlement:
     id: str
+    name: str                                              
     home_x: int
     home_y: int
     founded_tick: int
+    leader_id: str | None = None                           
     member_ids: set[str] = field(default_factory=set)
-    absence: dict[str, int] = field(default_factory=dict)  # agent_id -> consecutive absent ticks
-    vacancy_ticks: int = 0                                 # Ticks handled with 0 active members
-    active: bool = True                                    # Ghost town prevention
+    absence: dict[str, int] = field(default_factory=dict)  
+    vacancy_ticks: int = 0                                 
+    active: bool = True                                    
 
 
 class SettlementRegistry:
@@ -47,18 +59,24 @@ class SettlementRegistry:
 
     def found_settlement(self, x: int, y: int, current_tick: int) -> Settlement:
         settlement_id = f"STL-{next(self._counter)}"
-        settlement = Settlement(id=settlement_id, home_x=x, home_y=y, founded_tick=current_tick)
+        
+        # Generate an immersive, non-repetitive historical name from the expanded library
+        name_attempt = f"{random.choice(PREFIXES)}{random.choice(SUFFIXES)}"
+        existing_names = {s.name for s in self.settlements.values()}
+        while name_attempt in existing_names:
+            name_attempt = f"{random.choice(PREFIXES)}{random.choice(SUFFIXES)}"
+            
+        settlement = Settlement(id=settlement_id, name=name_attempt, home_x=x, home_y=y, founded_tick=current_tick)
         self.settlements[settlement_id] = settlement
         return settlement
 
 
 def resolve_settlements(agents: AgentRegistry, registry: SettlementRegistry, current_tick: int) -> None:
-    living = agents.living_agents()
+    living = agents.raw_living_agents()
     active_settlements = [s for s in registry.settlements.values() if s.active]
 
     # --- 1. EXISTING SETTLEMENTS: HYSTERESIS & PASSIVE JOINING ---
     for settlement in active_settlements:
-        # Check active members for drifting/absence
         for agent in living:
             if agent.settlement_id != settlement.id:
                 continue
@@ -69,9 +87,9 @@ def resolve_settlements(agents: AgentRegistry, registry: SettlementRegistry, cur
                 if settlement.absence[agent.id] > ABANDONMENT_GRACE_TICKS:
                     agent.settlement_id = None
                     settlement.member_ids.discard(agent.id)
-                    del settlement.absence[agent.id]
+                    if agent.id in settlement.absence:
+                        del settlement.absence[agent.id]
 
-        # Allow unaffiliated wandering agents to join passively if they step into range
         for agent in living:
             if agent.settlement_id is not None:
                 continue
@@ -80,43 +98,55 @@ def resolve_settlements(agents: AgentRegistry, registry: SettlementRegistry, cur
                 settlement.member_ids.add(agent.id)
                 settlement.absence[agent.id] = 0
 
-    # --- 2. GHOST TOWN DETECTION (ABANDONMENT Phase) ---
+    # --- 2. GHOST TOWN DETECTION & TRIBAL LEADERSHIP PROMOTION CONTROLS ---
     for settlement in active_settlements:
-        # Filter out members who died this tick
         living_ids = {a.id for a in living}
         settlement.member_ids &= living_ids
         
-        if len(settlement.member_ids) == 0:
+        local_cohort_pop = sum(c.count for pos, c in agents.cohorts.items() if getattr(c, 'settlement_id', None) == settlement.id)
+        combined_town_size = len(settlement.member_ids) + local_cohort_pop
+        
+        if combined_town_size == 0:
             settlement.vacancy_ticks += 1
             if settlement.vacancy_ticks >= MAX_SETTLEMENT_VACANCY_TICKS:
-                settlement.active = False # The settlement collapses into historical ruins
+                settlement.active = False 
         else:
             settlement.vacancy_ticks = 0
+            
+            # LEADERSHIP EVALUATION: Ensure the city has a living political anchor
+            current_leader = agents.agents.get(settlement.leader_id) if settlement.leader_id else None
+            if not current_leader or not current_leader.alive or current_leader.settlement_id != settlement.id:
+                candidates = [a for a in living if a.settlement_id == settlement.id and a.resolution != Resolution.COMPRESSED]
+                if candidates:
+                    oldest_candidate = max(candidates, key=lambda a: a.age)
+                    settlement.leader_id = oldest_candidate.id
+                    # Promote leader to HIGH resolution tracking mode
+                    oldest_candidate.resolution = Resolution.HIGH
 
-    # --- 3. OPTIMIZED NEW FORMATION (Spatial Grid Bucket Processing) ---
+    # --- 3. OPTIMIZED NEW FORMATION ---
     unaffiliated = [a for a in living if a.settlement_id is None]
-    if not unaffiliated:
-        registry.formation_streaks.clear()
-        return
-
-    # Count agent population density using an efficient coordinate dictionary mapping
+    
     agent_counts = defaultdict(int)
     for a in unaffiliated:
         agent_counts[(a.x, a.y)] += 1
+    for pos, cohort in agents.cohorts.items():
+        if cohort.settlement_id is None:
+            agent_counts[pos] += cohort.count
 
-    # Map candidate center tiles to total populations inside their relative search boxes
+    if not agent_counts:
+        registry.formation_streaks.clear()
+        return
+
     density = {}
     seed_tiles = set(agent_counts.keys())
     
     for sx, sy in seed_tiles:
         total_in_radius = 0
-        # Only evaluate nearby tiles containing agents rather than looping all agents globally
         for (ax, ay), count_on_tile in agent_counts.items():
             if max(abs(ax - sx), abs(ay - sy)) <= SETTLEMENT_RADIUS:
                 total_in_radius += count_on_tile
         density[(sx, sy)] = total_in_radius
 
-    # Maintain streaks and process structural foundation thresholds
     qualifying = {pos for pos, n in density.items() if n >= FOUNDING_MIN_POPULATION}
     for pos in list(registry.formation_streaks.keys()):
         if pos not in qualifying:
@@ -126,7 +156,6 @@ def resolve_settlements(agents: AgentRegistry, registry: SettlementRegistry, cur
 
     ready = [pos for pos, streak in registry.formation_streaks.items() if streak >= FOUNDING_MIN_DURATION]
     for (sx, sy) in sorted(ready, key=lambda p: (-density[p], p)):
-        # Re-verify matching candidates
         founding_members = [
             a for a in unaffiliated
             if a.settlement_id is None and _within_radius(a.x, a.y, sx, sy, SETTLEMENT_RADIUS)
@@ -139,4 +168,9 @@ def resolve_settlements(agents: AgentRegistry, registry: SettlementRegistry, cur
             a.settlement_id = settlement.id
             settlement.member_ids.add(a.id)
             settlement.absence[a.id] = 0
-        del registry.formation_streaks[(sx, sy)]
+            
+        if (sx, sy) in agents.cohorts:
+            agents.cohorts[(sx, sy)].settlement_id = settlement.id
+            
+        if (sx, sy) in registry.formation_streaks:
+            del registry.formation_streaks[(sx, sy)]

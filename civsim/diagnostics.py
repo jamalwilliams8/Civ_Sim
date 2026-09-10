@@ -1,25 +1,25 @@
-"""
-Diagnostics & Historical Chronicler: Compiles system metrics. 
-Defends against OneDrive cloud caching inconsistencies by using safe parameter lookups.
+﻿"""
+civsim/diagnostics.py
+Diagnostics & Historical Chronicler: Compiles active system metrics.
+Filters and groups archeological ruins by tiered historical significance.
 """
 
-from civsim.agents import AgentRegistry
+from civsim.agents import AgentRegistry, Resolution
 from civsim.world import World
 from civsim.settlements import SettlementRegistry
 
 
 def report(world: World, agents: AgentRegistry, settlements: SettlementRegistry, ticks_run: int) -> dict:
     all_agents = list(agents.agents.values())
-    living_high_res = [a for a in all_agents if a.alive]
+    living_high_res = [a for a in all_agents if a.alive and a.resolution != Resolution.COMPRESSED]
     dead = [a for a in all_agents if not a.alive]
 
-    # Sum up all hidden mathematical background populations
     low_res_population = sum(c.count for c in agents.cohorts.values())
     total_living_population = len(living_high_res) + low_res_population
 
     death_causes = {}
     for d in dead:
-        if d.death_cause != "compressed":  # Avoid tracking resolution shifts as actual mortality
+        if d.death_cause != "compressed":  
             death_causes[d.death_cause] = death_causes.get(d.death_cause, 0) + 1
 
     avg_health = sum(a.health for a in living_high_res) / len(living_high_res) if living_high_res else 0.0
@@ -27,31 +27,32 @@ def report(world: World, agents: AgentRegistry, settlements: SettlementRegistry,
     avg_food = sum(t.food_wild for t in tiles) / len(tiles)
 
     active_cities = []
-    discovered_ruins = []
+    historic_towns = []
+    grand_empires = []
 
     for s_id, s in settlements.settlements.items():
-        # OneDrive Cache Protection: Use safe getattr defaults to prevent crashes
-        peak_pop_val = getattr(s, "peak_population", 0)
-        is_active_val = getattr(s, "active", True)
-        is_ruin_val = getattr(s, "is_historical_ruin", False)
-        is_discovered_val = getattr(s, "discovered", False)
-
+        city_name = getattr(s, "name", s.id)
+        
         info = {
-            "id": s.id,
+            "name": city_name,
             "coordinates": (s.home_x, s.home_y),
             "founded_year": s.founded_tick,
-            "peak_pop": peak_pop_val,
-            "discovered": is_discovered_val
+            "peak_pop": getattr(s, "peak_population", 0),
+            "lifespan": getattr(s, "last_active_tick", s.founded_tick) - s.founded_tick
         }
         
-        if is_active_val:
-            # Include local coordinates cohort tracking inside city counts
+        if getattr(s, "active", True):
             local_cohort_pop = sum(c.count for pos, c in agents.cohorts.items() if getattr(c, "settlement_id", None) == s.id)
-            local_indiv_pop = sum(1 for a in living_high_res if a.settlement_id == s.id)
+            local_indiv_pop = sum(1 for a in all_agents if a.alive and a.settlement_id == s.id and a.resolution != Resolution.COMPRESSED)
             info["current_population"] = local_indiv_pop + local_cohort_pop
             active_cities.append(info)
-        elif is_ruin_val and is_discovered_val:
-            discovered_ruins.append(info)
+        else:
+            # FIX: Strict Tiered Classification logic
+            if info["lifespan"] >= 150 and info["peak_pop"] >= 150:
+                grand_empires.append(info)
+            elif info["lifespan"] >= 60 and info["peak_pop"] >= 40:
+                historic_towns.append(info)
+            # Anything beneath this (Lost Camps / Frontier Outposts) is silently omitted from display memory
 
     return {
         "ticks_run": ticks_run,
@@ -64,8 +65,10 @@ def report(world: World, agents: AgentRegistry, settlements: SettlementRegistry,
         "settlements": {
             "active_count": len(active_cities),
             "active_details": active_cities,
-            "ruins_count": len(discovered_ruins),
-            "ruins_details": discovered_ruins
+            "towns_count": len(historic_towns),
+            "towns_details": historic_towns,
+            "empires_count": len(grand_empires),
+            "empires_details": grand_empires
         }
     }
 
@@ -81,13 +84,20 @@ def print_history_book(report_data: dict) -> None:
     
     print(f"--- ACTIVE CIVILIZATIONS ({report_data['settlements']['active_count']}) ---")
     for city in report_data['settlements']['active_details']:
-        print(f" * {city['id']} at {city['coordinates']} | Founded: Yr {city['founded_year']} | Citizens: {city['current_population']}")
+        print(f" * The Domain of {city['name']} at {city['coordinates']} | Founded: Yr {city['founded_year']} | Active Citizens: {city['current_population']}")
         
-    ruins_count = report_data['settlements']['ruins_count']
-    if ruins_count > 0:
-        print(f"\n--- ARCHEOLOGICAL DISCOVERIES ({ruins_count}) ---")
-        for ruin in report_data['settlements']['ruins_details']:
-            print(f" * Agents discovered the ancient farming fields of {ruin['id']} at {ruin['coordinates']}")
-            print(f"   Significance: Reached a peak historical size of {ruin['peak_pop']} citizens before abandonment.")
+    empires_count = report_data['settlements']['empires_count']
+    if empires_count > 0:
+        print(f"\n--- LOST ANCIENT EMPIRES ({empires_count}) ---")
+        for empire in report_data['settlements']['empires_details']:
+            print(f" 🏛️  The monumental ruins of the Empire of {empire['name']} sit at {empire['coordinates']}.")
+            print(f"    Significance: Ruled the land for {empire['lifespan']} years, reaching a legendary size of {empire['peak_pop']} citizens before structural collapse.")
+            
+    towns_count = report_data['settlements']['towns_count']
+    if towns_count > 0:
+        print(f"\n--- HISTORIC ABANDONED TOWNS ({towns_count}) ---")
+        visible_towns = report_data['settlements']['towns_details'][-4:]  # Cap display density at last 4 for scannability
+        for town in visible_towns:
+            print(f" * The remains of the town of {town['name']} stand at {town['coordinates']} (Existed for {town['lifespan']} years | Peak Pop: {town['peak_pop']})")
             
     print("====================================================")

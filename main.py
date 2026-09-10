@@ -20,7 +20,7 @@ def main():
     print(f"====================================================\n")
 
     # 2. Advance time forward through historical blocks
-    target_ticks = 500
+    target_ticks = 1000
     print(f"Advancing time matrix forward by {target_ticks} years... Please wait.")
     sim.run(target_ticks)
     
