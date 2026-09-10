@@ -1,7 +1,7 @@
 ﻿"""
 civsim/simulation.py
 Central execution engine managing sequential tick loops across environmental, 
-social, economic, and technological layers.
+social, economic, governance, law, and technological layers.
 """
 
 import random
@@ -17,6 +17,7 @@ from civsim.hazards import resolve_wilderness_hazards
 from civsim.infrastructure import resolve_housing_infrastructure
 from civsim.governance import resolve_governance_decisions
 from civsim.economy import resolve_economic_barter_trade
+from civsim.law import resolve_social_friction_and_law  # Linked Law Enforcement Module
 from civsim.history import CausalityEngine  
 
 
@@ -61,28 +62,21 @@ class Simulation:
         self.current_tick += 1
         pre_step_active = {s_id: s.active for s_id, s in self.settlements.settlements.items()}
 
-        # 1. Spatial Movement Processing
+        # 1. Core Mechanics Pass
         resolve_movement(self.world, self.agents)
-        
-        # 2. Settlement Affiliations
         resolve_settlements(self.agents, self.settlements, self.current_tick)
-        
-        # 3. Governance Migration Split Decisions
         resolve_governance_decisions(self.world, self.agents, self.settlements, self.current_tick)
-        
-        # 4. Phase 3 Economy: Execute localized barter market caravan trades
         resolve_economic_barter_trade(self.world, self.settlements)
         
-        # 5. Wilderness Hazards
+        # 2. FIX: Run Phase 3 Law Enforcement and Social Friction Ticks
+        resolve_social_friction_and_law(self.world, self.agents, self.settlements, self.current_tick)
+        
+        # 3. Environment & Extraction Pass
         resolve_wilderness_hazards(self.agents, self.settlements, self.current_tick)
-        
-        # 6. Infrastructure Housing Builds
         resolve_housing_infrastructure(self.agents, self.settlements)
-        
-        # 7. Labor Resource Extraction
         resolve_resource_production(self.world, self.agents, self.tech_registry)
         
-        # 8. Technology Innovation
+        # 4. High-Speed Technology Innovations Pass
         cohort_cache = {}
         for cohort in self.agents.cohorts.values():
             if cohort.settlement_id:
@@ -96,16 +90,12 @@ class Simulation:
             
         self.tech_registry.resolve_innovation(self.settlements, self.current_tick)
         
-        # 9. Resource Consumption & Allocation Processing
+        # 5. Demographics Lifecycles Pass
         resolve_food_and_health(self.world, self.agents)
-        
-        # 10. Ecosystem Regeneration
         self.world.tick_ecosystem(self.agents)
-        
-        # 11. Demographics
         resolve_birth_and_death(self.agents, self.current_tick)
 
-        # 12. Graph Auditing
+        # 6. Graph Auditing Loops
         for s_id, s in self.settlements.settlements.items():
             if s_id not in pre_step_active:
                 self.history.record_event(self.current_tick, "FOUNDING", s.home_x, s.home_y, f"The settlement of {s.name} was established.")

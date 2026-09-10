@@ -1,7 +1,7 @@
 ﻿"""
 civsim/diagnostics.py
 Diagnostics & Historical Chronicler: Compiles active system metrics.
-Filters and groups archeological ruins by tiered historical significance.
+Updated to expose internal social friction indices, crime rates, and guard safety metrics.
 """
 
 from civsim.agents import AgentRegistry, Resolution
@@ -27,8 +27,7 @@ def report(world: World, agents: AgentRegistry, settlements: SettlementRegistry,
     avg_food = sum(t.food_wild for t in tiles) / len(tiles)
 
     active_cities = []
-    historic_towns = []
-    grand_empires = []
+    significant_ruins = []
 
     for s_id, s in settlements.settlements.items():
         city_name = getattr(s, "name", s.id)
@@ -38,7 +37,10 @@ def report(world: World, agents: AgentRegistry, settlements: SettlementRegistry,
             "coordinates": (s.home_x, s.home_y),
             "founded_year": s.founded_tick,
             "peak_pop": getattr(s, "peak_population", 0),
-            "lifespan": getattr(s, "last_active_tick", s.founded_tick) - s.founded_tick
+            "lifespan": getattr(s, "last_active_tick", s.founded_tick) - s.founded_tick,
+            # FIX: Pull cached legal system variables using fallback shields
+            "crime_rate": getattr(s, "crime_rate", 0.0),
+            "guard_force": getattr(s, "guard_force", 0.0)
         }
         
         if getattr(s, "active", True):
@@ -47,12 +49,10 @@ def report(world: World, agents: AgentRegistry, settlements: SettlementRegistry,
             info["current_population"] = local_indiv_pop + local_cohort_pop
             active_cities.append(info)
         else:
-            # FIX: Strict Tiered Classification logic
             if info["lifespan"] >= 150 and info["peak_pop"] >= 150:
-                grand_empires.append(info)
+                significant_ruins.append(info)
             elif info["lifespan"] >= 60 and info["peak_pop"] >= 40:
-                historic_towns.append(info)
-            # Anything beneath this (Lost Camps / Frontier Outposts) is silently omitted from display memory
+                significant_ruins.append(info)
 
     return {
         "ticks_run": ticks_run,
@@ -65,10 +65,8 @@ def report(world: World, agents: AgentRegistry, settlements: SettlementRegistry,
         "settlements": {
             "active_count": len(active_cities),
             "active_details": active_cities,
-            "towns_count": len(historic_towns),
-            "towns_details": historic_towns,
-            "empires_count": len(grand_empires),
-            "empires_details": grand_empires
+            "ruins_count": len(significant_ruins),
+            "ruins_details": significant_ruins
         }
     }
 
@@ -84,20 +82,15 @@ def print_history_book(report_data: dict) -> None:
     
     print(f"--- ACTIVE CIVILIZATIONS ({report_data['settlements']['active_count']}) ---")
     for city in report_data['settlements']['active_details']:
-        print(f" * The Domain of {city['name']} at {city['coordinates']} | Founded: Yr {city['founded_year']} | Active Citizens: {city['current_population']}")
+        # FIX: Proudly print clean crime rates and guard force allocations per city node
+        print(f" * The Domain of {city['name']} at {city['coordinates']} | Citizens: {city['current_population']}")
+        print(f"   [Society Status] Crime Index: {city['crime_rate']*100:.1f}% | Watch Force Duty: {city['guard_force']*100:.1f}% of population")
         
-    empires_count = report_data['settlements']['empires_count']
-    if empires_count > 0:
-        print(f"\n--- LOST ANCIENT EMPIRES ({empires_count}) ---")
-        for empire in report_data['settlements']['empires_details']:
-            print(f" 🏛️  The monumental ruins of the Empire of {empire['name']} sit at {empire['coordinates']}.")
-            print(f"    Significance: Ruled the land for {empire['lifespan']} years, reaching a legendary size of {empire['peak_pop']} citizens before structural collapse.")
-            
-    towns_count = report_data['settlements']['towns_count']
-    if towns_count > 0:
-        print(f"\n--- HISTORIC ABANDONED TOWNS ({towns_count}) ---")
-        visible_towns = report_data['settlements']['towns_details'][-4:]  # Cap display density at last 4 for scannability
-        for town in visible_towns:
-            print(f" * The remains of the town of {town['name']} stand at {town['coordinates']} (Existed for {town['lifespan']} years | Peak Pop: {town['peak_pop']})")
+    ruins_count = report_data['settlements']['ruins_count']
+    if ruins_count > 0:
+        print(f"\n--- ANCIENT HISTORICAL RUINS ({ruins_count}) ---")
+        for ruin in report_data['settlements']['ruins_details']:
+            print(f" * Travelers excavated the grand remains of {ruin['name']} at {ruin['coordinates']}.")
+            print(f"   Significance: Flourished for {ruin['lifespan']} years, reaching a peak size of {ruin['peak_pop']} citizens.")
             
     print("====================================================")
