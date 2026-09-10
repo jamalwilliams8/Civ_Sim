@@ -1,7 +1,7 @@
 ﻿"""
 civsim/diagnostics.py
 Diagnostics & Historical Chronicler: Compiles active system metrics.
-Updated to expose internal social friction indices, crime rates, and guard safety metrics.
+Exposes internal social friction indices, crime rates, and miraculous belief anomalies.
 """
 
 from civsim.agents import AgentRegistry, Resolution
@@ -38,9 +38,10 @@ def report(world: World, agents: AgentRegistry, settlements: SettlementRegistry,
             "founded_year": s.founded_tick,
             "peak_pop": getattr(s, "peak_population", 0),
             "lifespan": getattr(s, "last_active_tick", s.founded_tick) - s.founded_tick,
-            # FIX: Pull cached legal system variables using fallback shields
             "crime_rate": getattr(s, "crime_rate", 0.0),
-            "guard_force": getattr(s, "guard_force", 0.0)
+            "guard_force": getattr(s, "guard_force", 0.0),
+            # FIX: Pull cached miracle variable strings safely using fallback defaults
+            "miracle_status": getattr(s, "last_miracle_result", "NO_RECENT_PHENOMENA")
         }
         
         if getattr(s, "active", True):
@@ -82,15 +83,9 @@ def print_history_book(report_data: dict) -> None:
     
     print(f"--- ACTIVE CIVILIZATIONS ({report_data['settlements']['active_count']}) ---")
     for city in report_data['settlements']['active_details']:
-        # FIX: Proudly print clean crime rates and guard force allocations per city node
         print(f" * The Domain of {city['name']} at {city['coordinates']} | Citizens: {city['current_population']}")
-        print(f"   [Society Status] Crime Index: {city['crime_rate']*100:.1f}% | Watch Force Duty: {city['guard_force']*100:.1f}% of population")
+        print(f"   [Society Status] Crime Index: {city['crime_rate']*100:.1f}% | Watch Force: {city['guard_force']*100:.1f}%")
+        # FIX: Print the emergent miracle resolution ledger string
+        print(f"   [Belief Matrix ] Last Miracle Record: {city['miracle_status']}")
         
-    ruins_count = report_data['settlements']['ruins_count']
-    if ruins_count > 0:
-        print(f"\n--- ANCIENT HISTORICAL RUINS ({ruins_count}) ---")
-        for ruin in report_data['settlements']['ruins_details']:
-            print(f" * Travelers excavated the grand remains of {ruin['name']} at {ruin['coordinates']}.")
-            print(f"   Significance: Flourished for {ruin['lifespan']} years, reaching a peak size of {ruin['peak_pop']} citizens.")
-            
     print("====================================================")

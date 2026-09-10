@@ -1,11 +1,12 @@
 ﻿"""
 civsim/simulation.py
 Central execution engine managing sequential tick loops across environmental, 
-social, economic, governance, law, culture, occupations, defense, and tech layers.
+social, economic, governance, law, culture, occupations, defense, religion, and tech layers.
 """
 
 import random
 import time
+import copy
 from civsim.world import World
 from civsim.agents import AgentRegistry
 from civsim.settlements import SettlementRegistry, resolve_settlements
@@ -19,8 +20,9 @@ from civsim.governance import resolve_governance_decisions
 from civsim.economy import resolve_economic_barter_trade
 from civsim.law import resolve_social_friction_and_law
 from civsim.culture import CultureRegistry  
-from civsim.occupations import resolve_occupations          # Linked Occupations Loop
-from civsim.military import resolve_military_and_raiders    # Linked Defensive/Siege Engine
+from civsim.occupations import resolve_occupations          
+from civsim.military import resolve_military_and_raiders    
+from civsim.religion import resolve_miracles_and_belief     # Linked Religion Module
 from civsim.history import CausalityEngine  
 
 
@@ -70,22 +72,23 @@ class Simulation:
         self.current_tick += 1
         pre_step_active = {s_id: s.active for s_id, s in self.settlements.settlements.items()}
 
-        # 1. Structural Movement and Settlement Affiliations Pass
+        # 1. Structural Movement & Settlements Pass
         resolve_movement(self.world, self.agents)
         resolve_settlements(self.agents, self.settlements, self.current_tick)
         resolve_governance_decisions(self.world, self.agents, self.settlements, self.current_tick, self.culture_registry)
         
-        # 2. Phase 3 Labor Specializations Division Loops
+        # 2. Labor & Military Loops
         resolve_occupations(self.agents, self.settlements)
-        
-        # 3. Phase 3 Military Siege Fortifications & Raider Attacks Loops
         resolve_military_and_raiders(self.world, self.agents, self.settlements, self.current_tick)
         
-        # 4. Economic Exchange, Crime Suppression & Law Passes
+        # 3. FIX: Run Phase 3 Emergent Miracles and Belief Calculations
+        resolve_miracles_and_belief(self.world, self.agents, self.settlements, self.current_tick)
+        
+        # 4. Economic, Social Order & Public Safety Loops
         resolve_economic_barter_trade(self.world, self.settlements)
         resolve_social_friction_and_law(self.world, self.agents, self.settlements, self.current_tick)
         
-        # 5. Extraction, Hazards, and Infrastructure Upkeeps
+        # 5. Infrastructure and Extraction Upkeeps
         resolve_wilderness_hazards(self.agents, self.settlements, self.current_tick)
         resolve_housing_infrastructure(self.agents, self.settlements)
         resolve_resource_production(self.world, self.agents, self.tech_registry)
@@ -104,12 +107,12 @@ class Simulation:
             
         self.tech_registry.resolve_innovation(self.settlements, self.current_tick)
         
-        # 7. Lifecycle Demographics Passes
+        # 7. Demographics Lifecycles
         resolve_food_and_health(self.world, self.agents)
         self.world.tick_ecosystem(self.agents)
         resolve_birth_and_death(self.agents, self.current_tick)
 
-        # 8. Causal Graph Node Logging
+        # 8. Graph Node Logging
         for s_id, s in self.settlements.settlements.items():
             if s_id not in pre_step_active:
                 cult = self.culture_registry.get_culture(s_id)
@@ -117,14 +120,13 @@ class Simulation:
             elif pre_step_active[s_id] and not s.active:
                 self.history.record_event(self.current_tick, "ABANDONMENT", s.home_x, s.home_y, f"The settlement of {s.name} faded into historical ruins.")
 
+    def fork_branch(self):
+        return copy.deepcopy(self)
+
     def run(self, ticks: int) -> None:
         start_time = time.time()
         for _ in range(ticks):
             self.step()
-            if self.verbose and self.current_tick % 100 == 0:
-                summary = self.get_summary()
-                print(f"[Tick {summary['tick']:04d}] Pop: {summary['combined_population']} | Settlements: {summary['active_settlements']}")
-                
         elapsed = time.time() - start_time
         summary = self.get_summary()
         print(f"✓ Advanced time matrix by {ticks} ticks in {elapsed:.2f}s | Final Population: {summary['combined_population']} | Active Domains: {summary['active_settlements']}.")
