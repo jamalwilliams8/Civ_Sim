@@ -1,7 +1,7 @@
 ﻿"""
 civsim/movement.py
 Agent behavior: Integrated Adaptive Resolution Management.
-Optimized to integrate individual risk-awareness and environmental danger perception.
+Optimized to parse regional tundra climate boundaries and enforce hazard migration memory.
 """
 
 from collections import defaultdict
@@ -13,7 +13,7 @@ MAX_ALLOWED_HIGH_RES_INDIVIDUALS = 100
 
 
 def resolve_movement(world: World, agents: AgentRegistry) -> None:
-    """Executes pathfinding steps utilizing individual hazard awareness constraints."""
+    """Executes pathfinding steps utilizing regional safety and hazard memory weights."""
     all_raw_living = agents.raw_living_agents()
     
     # Enforce performance throttle ceiling
@@ -22,8 +22,7 @@ def resolve_movement(world: World, agents: AgentRegistry) -> None:
         current_high_res.sort(key=lambda a: a.age)
         excess_count = len(current_high_res) - MAX_ALLOWED_HIGH_RES_INDIVIDUALS
         for i in range(excess_count):
-            agent_to_throttle = current_high_res[i]
-            agent_to_throttle.resolution = Resolution.COMPRESSED
+            current_high_res[i].resolution = Resolution.COMPRESSED
 
     living = agents.living_agents()
     if not living:
@@ -37,15 +36,12 @@ def resolve_movement(world: World, agents: AgentRegistry) -> None:
     for pos, agents_on_tile in grid_buckets.items():
         if len(agents_on_tile) >= 3:  
             if pos not in agents.cohorts:
-                lead_agent = agents_on_tile
+                lead_agent = agents_on_tile[0]
                 s_id = getattr(lead_agent, "settlement_id", None)
                 gen = getattr(lead_agent, "generation", 0)
                 
                 agents.cohorts[pos] = DemographicCohort(
-                    x=pos[0], 
-                    y=pos[1], 
-                    generation=gen,
-                    settlement_id=s_id
+                    x=pos[0], y=pos[1], generation=gen, settlement_id=s_id
                 )
             
             cohort = agents.cohorts[pos]
@@ -74,16 +70,15 @@ def resolve_movement(world: World, agents: AgentRegistry) -> None:
         origin_pos = (cx, cy)
         current_tile = world.get_tile(cx, cy)
         
-        # REALISM CHECK: Risk-awareness behavior loop
-        # High hazard memory suppresses curiosity wandering, forcing agents to stay sheltered
         danger_memory = getattr(agent, "hazard_experience", 0.0)
         local_occupants = occupancy.get(origin_pos, 1)
         
-        # If danger memory is high, the agent prioritizes localized urban safety over wandering
-        if danger_memory > 2.0 and agent.settlement_id is not None:
-            continue  # Lock position to stay huddled inside the settlement infrastructure boundary
+        # Incremental Spatial Learning: Update hazard memory dynamically if stuck in the cold tundra
+        if current_tile.zone_type == "TUNDRA" and world.northern_weather == "FREEZE":
+            agent.hazard_experience += 0.5
+            agent.health = max(1.0, agent.health - 1.0) # Apply cold damage exposure
 
-        if (current_tile.food_wild / max(1, local_occupants)) >= FOOD_NEED_PER_TICK:
+        if (current_tile.food_wild / max(1, local_occupants)) >= FOOD_NEED_PER_TICK and danger_memory < 2.0:
             continue  
 
         best_target = None
@@ -101,7 +96,13 @@ def resolve_movement(world: World, agents: AgentRegistry) -> None:
                 target_pos = (nx, ny)
                 tile = world.get_tile(nx, ny)
                 
-                food_share = tile.food_wild / (occupancy.get(target_pos, 0) + 1)
+                # REGIONAL LEARNING FEEDBACK: If agent has survived cold tundra trauma,
+                # apply a major penalty to northern steps to force them to migrate south.
+                regional_preference = 1.0
+                if tile.zone_type == "TUNDRA" and danger_memory > 1.0:
+                    regional_preference = 0.05 # Aggressively avoid northern tundra tiles
+
+                food_share = (tile.food_wild / (occupancy.get(target_pos, 0) + 1)) * regional_preference
                 if food_share >= FOOD_NEED_PER_TICK and food_share > best_food:
                     best_food = food_share
                     best_target = target_pos
@@ -109,7 +110,8 @@ def resolve_movement(world: World, agents: AgentRegistry) -> None:
         if best_target is None:
             h = agent.id.__hash__()
             dx = (h % 3) - 1
-            dy = ((h // 3) % 3) - 1
+            # Learn to prefer heading south (+1) if traumatized by the tundra freeze
+            dy = 1 if danger_memory > 1.0 else ((h // 3) % 3) - 1
             tx = min(max(cx + dx, 0), world.width - 1)
             ty = min(max(cy + dy, 0), world.height - 1)
             best_target = (tx, ty)
