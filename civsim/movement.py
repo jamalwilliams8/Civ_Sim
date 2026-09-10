@@ -1,7 +1,7 @@
 ﻿"""
 civsim/movement.py
 Agent behavior: Integrated Adaptive Resolution Management.
-Optimized via aggressive background throttling to cap active high-res entities at 100.
+Optimized to integrate individual risk-awareness and environmental danger perception.
 """
 
 from collections import defaultdict
@@ -9,14 +9,14 @@ from civsim.agents import Agent, AgentRegistry, DemographicCohort, FOOD_NEED_PER
 from civsim.world import World
 
 SEARCH_RADIUS = 2  
-MAX_ALLOWED_HIGH_RES_INDIVIDUALS = 100  # Strict throttle ceiling to protect frame calculations
+MAX_ALLOWED_HIGH_RES_INDIVIDUALS = 100  
 
 
 def resolve_movement(world: World, agents: AgentRegistry) -> None:
-    """Executes pathfinding steps utilizing a high-speed pre-computed spatial map."""
+    """Executes pathfinding steps utilizing individual hazard awareness constraints."""
     all_raw_living = agents.raw_living_agents()
     
-    # 1. ENFORCE PERFORMANCE THROTTLE CEILING
+    # Enforce performance throttle ceiling
     current_high_res = [a for a in all_raw_living if a.resolution != Resolution.COMPRESSED]
     if len(current_high_res) > MAX_ALLOWED_HIGH_RES_INDIVIDUALS:
         current_high_res.sort(key=lambda a: a.age)
@@ -29,23 +29,21 @@ def resolve_movement(world: World, agents: AgentRegistry) -> None:
     if not living:
         return
     
-    # 2. SPATIAL INDEXING: Group individual agents by coordinate buckets
     grid_buckets = defaultdict(list)
     for agent in living:
         grid_buckets[(agent.x, agent.y)].append(agent)
 
-    # 3. COHORT COMPRESSION
+    # Cohort compression
     for pos, agents_on_tile in grid_buckets.items():
         if len(agents_on_tile) >= 3:  
             if pos not in agents.cohorts:
-                lead_agent = agents_on_tile[0]
+                lead_agent = agents_on_tile
                 s_id = getattr(lead_agent, "settlement_id", None)
                 gen = getattr(lead_agent, "generation", 0)
                 
-                # FIX: Explicitly index into the tuple to unpack x and y components safely
                 agents.cohorts[pos] = DemographicCohort(
-                    x=int(pos[0]), 
-                    y=int(pos[1]), 
+                    x=pos[0], 
+                    y=pos[1], 
                     generation=gen,
                     settlement_id=s_id
                 )
@@ -61,23 +59,30 @@ def resolve_movement(world: World, agents: AgentRegistry) -> None:
             cohort.count += new_count
             cohort.total_age += new_age
 
-    # Refresh array tracking references
     living = agents.living_agents()
 
-    # 4. UNIFIED OCCUPANCY REFERENCE MAP
+    # Unified occupancy map
     occupancy = defaultdict(int)
     for c_pos, cohort in agents.cohorts.items():
         occupancy[c_pos] += cohort.count
     for agent in living:
         occupancy[(agent.x, agent.y)] += 1
 
-    # 5. DYNAMIC NAVIGATION LOOP
+    # Dynamic Navigation Loop
     for agent in living:
         cx, cy = agent.x, agent.y
         origin_pos = (cx, cy)
         current_tile = world.get_tile(cx, cy)
         
+        # REALISM CHECK: Risk-awareness behavior loop
+        # High hazard memory suppresses curiosity wandering, forcing agents to stay sheltered
+        danger_memory = getattr(agent, "hazard_experience", 0.0)
         local_occupants = occupancy.get(origin_pos, 1)
+        
+        # If danger memory is high, the agent prioritizes localized urban safety over wandering
+        if danger_memory > 2.0 and agent.settlement_id is not None:
+            continue  # Lock position to stay huddled inside the settlement infrastructure boundary
+
         if (current_tile.food_wild / max(1, local_occupants)) >= FOOD_NEED_PER_TICK:
             continue  
 

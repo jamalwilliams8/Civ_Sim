@@ -1,7 +1,7 @@
 ﻿"""
 civsim/world.py
 Persistent environment map: tracks tile-by-tile wild resources, soil health degradation vectors, 
-and global cyclical Weather/Climate patterns with an embedded early historical grace era.
+and global cyclical Weather/Climate patterns. Raw and unscripted from Year 0.
 """
 
 import random
@@ -30,10 +30,10 @@ class World:
             for y in range(height):
                 self.tiles[(x, y)] = Tile(
                     x=x, y=y,
-                    max_food=25.0,        # Raised to give early hunter-gatherers a healthy starting runway
+                    max_food=25.0,        # Expanded base resource baseline pool
                     food_wild=25.0,
                     soil_health=1.0,
-                    regen_rate=0.7        # Safe baseline recovery rate
+                    regen_rate=0.6        # Standardized regeneration speed
                 )
 
     def get_tile(self, x: int, y: int) -> Tile:
@@ -41,18 +41,10 @@ class World:
 
     def tick_ecosystem(self, agents_registry) -> None:
         """Processes environment changes, climate trends, and soil load carrying capacities."""
-        current_tick = getattr(agents_registry, "current_tick", 200) # Safe fallback padding
-        
-        # 1. Update Weather Cycle with an Initial Historical Grace Era
-        # To maintain realism, lock the climate out of droughts/freezes for the first 150 years
-        if current_tick < 150:
-            if random.random() < 0.10:
-                self.current_weather = random.choice(["NORMAL", "WET"])
-        else:
-            if random.random() < 0.10:
-                self.current_weather = random.choice(WEATHER_TYPES)
+        # REALISM CHECK: Unscripted, dynamic weather shifts can execute from Tick 1
+        if random.random() < 0.08:
+            self.current_weather = random.choice(WEATHER_TYPES)
 
-        # 2. Compute resource depletion and consumption impacts per cell
         occupancy = {}
         for agent in agents_registry.raw_living_agents():
             pos = (agent.x, agent.y)
@@ -61,10 +53,10 @@ class World:
         for c_pos, cohort in agents_registry.cohorts.items():
             occupancy[c_pos] = occupancy.get(c_pos, 0) + cohort.count
 
-        # Apply climate multipliers
+        # Compute climate modifiers
         weather_modifier = 1.0
         if self.current_weather == "DROUGHT":
-            weather_modifier = 0.30  
+            weather_modifier = 0.25  
         elif self.current_weather == "FREEZE":
             weather_modifier = 0.10  
 
@@ -84,4 +76,4 @@ class World:
 
             # Population extraction depletion
             if load > 0:
-                tile.food_wild = max(0.0, tile.food_wild - (load * 0.10))
+                tile.food_wild = max(0.0, tile.food_wild - (load * 0.08))
