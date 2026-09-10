@@ -23,7 +23,7 @@ from civsim.culture import CultureRegistry
 from civsim.occupations import resolve_occupations          
 from civsim.military import resolve_military_and_raiders    
 from civsim.religion import resolve_miracles_and_belief     
-from civsim.library import resolve_libraries_and_preservation  # Linked Library Module
+from civsim.library import resolve_libraries_and_preservation  
 from civsim.history import CausalityEngine  
 
 
@@ -71,21 +71,25 @@ class Simulation:
 
     def step(self) -> None:
         self.current_tick += 1
+        
+        if hasattr(self.agents, "current_tick"):
+            self.agents.current_tick = self.current_tick
+            
         pre_step_active = {s_id: s.active for s_id, s in self.settlements.settlements.items()}
 
-        # 1. Structural Movement & Settlements Pass
-        resolve_movement(self.world, self.agents)
+        # 1. Structural Movement & Settlements Pass 
+        resolve_movement(self.world, self.agents, self.tech_registry)
         resolve_settlements(self.agents, self.settlements, self.current_tick)
         resolve_governance_decisions(self.world, self.agents, self.settlements, self.current_tick, self.culture_registry)
         
-        # 2. Labor Specializations & Military Events
+        # 2. Labor & Military Loops
         resolve_occupations(self.agents, self.settlements)
         resolve_military_and_raiders(self.world, self.agents, self.settlements, self.current_tick)
         
         # 3. Phase 3 Religion, Beliefs and Miracles
         resolve_miracles_and_belief(self.world, self.agents, self.settlements, self.current_tick)
         
-        # 4. FIX: Run Phase 2/4 Archive Libraries & Written Preservation Checks
+        # 4. Phase 2/4 Archive Libraries & Written Preservation Checks
         resolve_libraries_and_preservation(self.agents, self.settlements, self.tech_registry)
         
         # 5. Economy & Law Enforcement Systems
@@ -111,9 +115,9 @@ class Simulation:
             
         self.tech_registry.resolve_innovation(self.settlements, self.current_tick)
         
-        # 8. Demographic Consumption Lifecycles
+        # 8. Demographic Consumption Lifecycles (FIX: Passing Tech Registry to evaluate farming multipliers)
         resolve_food_and_health(self.world, self.agents)
-        self.world.tick_ecosystem(self.agents)
+        self.world.tick_ecosystem(self.agents, self.tech_registry)
         resolve_birth_and_death(self.agents, self.current_tick)
 
         # 9. Graph Auditing Node Entries
