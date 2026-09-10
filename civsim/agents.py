@@ -42,9 +42,10 @@ class Agent:
     death_cause: str | None = None
     settlement_id: str | None = None
     
-    # Phase 2 Social-Environmental Extensions
-    hazard_experience: float = 0.0   # Adaptive memory scalar from surviving wilderness exposure
-    housing_quality: float = 1.0     # Mitigates environment/crowding degradation factors
+    # Phase 2 & 3 Social-Environmental Extensions
+    hazard_experience: float = 0.0   
+    housing_quality: float = 1.0     
+    occupation: str = "FARMER"       # FIX: Added explicit specialized socio-economic labor field
 
     def is_fertile(self) -> bool:
         return (

@@ -1,7 +1,7 @@
 ﻿"""
 civsim/simulation.py
 Central execution engine managing sequential tick loops across environmental, 
-social, economic, governance, law, and technological layers.
+social, economic, governance, law, culture, occupations, defense, and tech layers.
 """
 
 import random
@@ -17,24 +17,31 @@ from civsim.hazards import resolve_wilderness_hazards
 from civsim.infrastructure import resolve_housing_infrastructure
 from civsim.governance import resolve_governance_decisions
 from civsim.economy import resolve_economic_barter_trade
-from civsim.law import resolve_social_friction_and_law  # Linked Law Enforcement Module
+from civsim.law import resolve_social_friction_and_law
+from civsim.culture import CultureRegistry  
+from civsim.occupations import resolve_occupations          # Linked Occupations Loop
+from civsim.military import resolve_military_and_raiders    # Linked Defensive/Siege Engine
 from civsim.history import CausalityEngine  
 
 
 class Simulation:
     def __init__(self, config=None, seed: int = 42, width: int = 50, height: int = 50):
         starting_pop = 50
+        self.verbose = False
+        
         if config is not None:
             if isinstance(config, dict):
                 self.seed = config.get("seed", seed)
                 width = config.get("world_width", width)
                 height = config.get("world_height", height)
                 starting_pop = config.get("starting_population", starting_pop)
+                self.verbose = config.get("verbose", False)
             else:
                 self.seed = getattr(config, "seed", seed)
                 width = getattr(config, "world_width", width)
                 height = getattr(config, "world_height", height)
                 starting_pop = getattr(config, "starting_population", starting_pop)
+                self.verbose = getattr(config, "verbose", False)
         else:
             self.seed = seed
 
@@ -47,6 +54,7 @@ class Simulation:
         self.agents = AgentRegistry()
         self.settlements = SettlementRegistry()
         self.tech_registry = TechRegistry()  
+        self.culture_registry = CultureRegistry()  
         self.history = CausalityEngine()  
 
         center_x = width // 2
@@ -62,21 +70,27 @@ class Simulation:
         self.current_tick += 1
         pre_step_active = {s_id: s.active for s_id, s in self.settlements.settlements.items()}
 
-        # 1. Core Mechanics Pass
+        # 1. Structural Movement and Settlement Affiliations Pass
         resolve_movement(self.world, self.agents)
         resolve_settlements(self.agents, self.settlements, self.current_tick)
-        resolve_governance_decisions(self.world, self.agents, self.settlements, self.current_tick)
-        resolve_economic_barter_trade(self.world, self.settlements)
+        resolve_governance_decisions(self.world, self.agents, self.settlements, self.current_tick, self.culture_registry)
         
-        # 2. FIX: Run Phase 3 Law Enforcement and Social Friction Ticks
+        # 2. Phase 3 Labor Specializations Division Loops
+        resolve_occupations(self.agents, self.settlements)
+        
+        # 3. Phase 3 Military Siege Fortifications & Raider Attacks Loops
+        resolve_military_and_raiders(self.world, self.agents, self.settlements, self.current_tick)
+        
+        # 4. Economic Exchange, Crime Suppression & Law Passes
+        resolve_economic_barter_trade(self.world, self.settlements)
         resolve_social_friction_and_law(self.world, self.agents, self.settlements, self.current_tick)
         
-        # 3. Environment & Extraction Pass
+        # 5. Extraction, Hazards, and Infrastructure Upkeeps
         resolve_wilderness_hazards(self.agents, self.settlements, self.current_tick)
         resolve_housing_infrastructure(self.agents, self.settlements)
         resolve_resource_production(self.world, self.agents, self.tech_registry)
         
-        # 4. High-Speed Technology Innovations Pass
+        # 6. Technology Innovations Caching
         cohort_cache = {}
         for cohort in self.agents.cohorts.values():
             if cohort.settlement_id:
@@ -90,28 +104,30 @@ class Simulation:
             
         self.tech_registry.resolve_innovation(self.settlements, self.current_tick)
         
-        # 5. Demographics Lifecycles Pass
+        # 7. Lifecycle Demographics Passes
         resolve_food_and_health(self.world, self.agents)
         self.world.tick_ecosystem(self.agents)
         resolve_birth_and_death(self.agents, self.current_tick)
 
-        # 6. Graph Auditing Loops
+        # 8. Causal Graph Node Logging
         for s_id, s in self.settlements.settlements.items():
             if s_id not in pre_step_active:
-                self.history.record_event(self.current_tick, "FOUNDING", s.home_x, s.home_y, f"The settlement of {s.name} was established.")
+                cult = self.culture_registry.get_culture(s_id)
+                self.history.record_event(self.current_tick, "FOUNDING", s.home_x, s.home_y, f"The {cult} settlement of {s.name} was established.")
             elif pre_step_active[s_id] and not s.active:
                 self.history.record_event(self.current_tick, "ABANDONMENT", s.home_x, s.home_y, f"The settlement of {s.name} faded into historical ruins.")
 
     def run(self, ticks: int) -> None:
-        print(f"--- Advancing timeline by {ticks} ticks ---")
         start_time = time.time()
         for _ in range(ticks):
             self.step()
-            if self.current_tick % 100 == 0:
+            if self.verbose and self.current_tick % 100 == 0:
                 summary = self.get_summary()
                 print(f"[Tick {summary['tick']:04d}] Pop: {summary['combined_population']} | Settlements: {summary['active_settlements']}")
+                
         elapsed = time.time() - start_time
-        print(f"✓ Completed {ticks} ticks in {elapsed:.2f}s.")
+        summary = self.get_summary()
+        print(f"✓ Advanced time matrix by {ticks} ticks in {elapsed:.2f}s | Final Population: {summary['combined_population']} | Active Domains: {summary['active_settlements']}.")
 
     def get_summary(self) -> dict:
         living_count = len(self.agents.living_agents())
