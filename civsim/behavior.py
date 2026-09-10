@@ -1,13 +1,14 @@
 """
-Agent behavior: Optimized LOW-resolution survival movement.
-Uses an accelerated lookup grid to ensure high-population throughput.
+Agent behavior: Integrated Adaptive Resolution Management.
+Compresses excess individual agents into spatial math cohorts to prevent CPU lag.
 """
 
 from collections import defaultdict
-from civsim.agents import Agent, AgentRegistry, FOOD_NEED_PER_TICK
+from civsim.agents import Agent, AgentRegistry, DemographicCohort, FOOD_NEED_PER_TICK
 from civsim.world import World
 
-SEARCH_RADIUS = 2  # Scaled down slightly to drastically reduce calculation matrices
+SEARCH_RADIUS = 2  
+COHORT_COMPRESSION_THRESHOLD = 30  # Max individual agent instances allowed per single tile
 
 
 def _per_capita_food(tile, occupancy: dict, extra: int = 0) -> float:
@@ -16,34 +17,54 @@ def _per_capita_food(tile, occupancy: dict, extra: int = 0) -> float:
 
 
 def resolve_movement(world: World, agents: AgentRegistry) -> None:
-    """
-    Optimized movement phase. Fast-tracks contented agents to bypass 
-    expensive ring-search lookups, keeping computational cost minimal.
-    """
+    """Executes spatial checks and manages individual agent-to-cohort compression triggers."""
     living = agents.living_agents()
-    if not living:
-        return
+    
+    # 1. Adaptive Resolution Check: Group individual agents by spatial grid locations
+    grid_buckets = defaultdict(list)
+    for agent in living:
+        grid_buckets[(agent.x, agent.y)].append(agent)
 
-    # 1. Pre-calculate spatial occupancy in a single fast pass
+    # 2. Compress heavy nodes into Demographic Cohort blocks
+    for pos, agents_on_tile in grid_buckets.items():
+        if len(agents_on_tile) >= COHORT_COMPRESSION_THRESHOLD:
+            # Pull or initialize target spatial cohort block
+            if pos not in agents.cohorts:
+                first_agent = agents_on_tile[0]
+                agents.cohorts[pos] = DemographicCohort(
+                    x=pos[0], 
+                    y=pos[1], 
+                    generation=first_agent.generation,
+                    settlement_id=first_agent.settlement_id
+                )
+            
+            cohort = agents.cohorts[pos]
+            for agent in agents_on_tile:
+                cohort.count += 1
+                cohort.total_age += agent.age
+                # Safely transition individual object into tracking state math
+                agent.die(0, "compressed")  
+
+    # Refresh tracking reference maps
+    living = agents.living_agents()
+
     occupancy = defaultdict(int)
+    for pos, cohort in agents.cohorts.items():
+        occupancy[pos] += cohort.count
     for agent in living:
         occupancy[(agent.x, agent.y)] += 1
 
-    # 2. Process movement decisions
+    # 3. Individual Movement Loop execution
     for agent in living:
         cx, cy = agent.x, agent.y
         current = world.get_tile(cx, cy)
         
-        # --- SPEED OPTIMIZATION PROFILING ---
-        # If the agent's current fair share is perfectly fine, bypass all search logic entirely!
         if _per_capita_food(current, occupancy) >= FOOD_NEED_PER_TICK:
             continue  
 
-        # 3. Only look outwards if local resources are actively missing
         best_target = None
         best_food = -1.0
         
-        # Fast local bounding box check instead of nested coordinate lookups
         min_x = max(0, cx - SEARCH_RADIUS)
         max_x = min(world.width - 1, cx + SEARCH_RADIUS)
         min_y = max(0, cy - SEARCH_RADIUS)
@@ -54,14 +75,12 @@ def resolve_movement(world: World, agents: AgentRegistry) -> None:
                 if nx == cx and ny == cy:
                     continue
                 tile = world.get_tile(nx, ny)
-                # Count if we were to arrive there
                 food_share = _per_capita_food(tile, occupancy, extra=1)
                 
                 if food_share >= FOOD_NEED_PER_TICK and food_share > best_food:
                     best_food = food_share
                     best_target = tile
 
-        # 4. Execute physical step toward target coordinate
         if best_target is not None:
             occupancy[(cx, cy)] -= 1
             step_x = (best_target.x > cx) - (best_target.x < cx)

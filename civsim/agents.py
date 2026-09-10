@@ -1,11 +1,10 @@
 """
-Persistent individual agents: identity, aging, food/health, death, and
-simulation resolution. Every agent is a real, inspectable object regardless
-of resolution — resolution controls how much decision logic runs on them,
-not whether they exist as individuals.
+Persistent individual agents and compressed demographic cohorts.
+Provides the data architecture for dynamic resolution scaling:
+LOW resolution agents are optimized into Cohort blocks to protect scale.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from itertools import count
 
@@ -17,14 +16,14 @@ HEALTH_GAIN_IF_FED = 1.0
 HEALTH_LOSS_IF_UNFED = 3.0
 MIN_BREEDING_AGE = 15
 MAX_BREEDING_AGE = 45
-OLD_AGE_ONSET = 50    # age at which old-age mortality risk begins
-OLD_AGE_MAX = 80       # age at which death from old age becomes certain
+OLD_AGE_ONSET = 50    
+OLD_AGE_MAX = 80       
 
 
 class Resolution(Enum):
-    LOW = "low"       # ordinary population: identity + basic stats only
-    MEDIUM = "medium" # locally relevant: gets goals/relationships later
-    HIGH = "high"     # historically significant: full decision detail later
+    LOW = "low"       # Aggregated into fast demographic math cohorts
+    MEDIUM = "medium" # Locally tracked agent objects
+    HIGH = "high"     # Historically significant figures (Leaders/Inventors)
 
 
 @dataclass(slots=True)
@@ -50,12 +49,29 @@ class Agent:
         self.death_cause = cause
 
 
+@dataclass
+class DemographicCohort:
+    """
+    Compresses hundreds of LOW-resolution agents on a single tile into 
+    one fast mathematical cohort block, preventing individual CPU loop chokes.
+    """
+    x: int
+    y: int
+    count: int = 0
+    total_age: float = 0.0
+    avg_health: float = STARTING_HEALTH
+    settlement_id: str | None = None
+    generation: int = 0
+
+
 class AgentRegistry:
-    """Owns every agent that has ever existed. This is the only place agents are created."""
+    """Owns every individual agent and compressed cohort inside the world."""
 
     def __init__(self):
         self._counter = count(1)
         self.agents: dict[str, Agent] = {}
+        # Spatial tracker for optimized low-resolution blocks
+        self.cohorts: dict[tuple[int, int], DemographicCohort] = {}
 
     def create_agent(self, generation: int, x: int, y: int) -> Agent:
         agent_id = f"AGT-{generation}-{next(self._counter)}"
@@ -64,17 +80,13 @@ class AgentRegistry:
         return agent
 
     def get(self, agent_id: str) -> Agent:
-        """Look up any agent by ID, regardless of resolution — this is what
-        makes 'click any of the 100k and see a real individual' possible."""
         return self.agents[agent_id]
 
     def living_agents(self) -> list[Agent]:
         return [a for a in self.agents.values() if a.alive]
 
-    def by_resolution(self, resolution: Resolution) -> list[Agent]:
-        return [a for a in self.agents.values() if a.alive and a.resolution == resolution]
-
     def tick(self) -> None:
+        """Ages tracked individual agents."""
         for agent in self.agents.values():
             if agent.alive:
                 agent.age += 1
