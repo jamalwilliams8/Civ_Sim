@@ -6,6 +6,8 @@ to execute pioneer splits with explicit Phase 3 Cultural Drift mutations.
 
 import random
 from civsim.agents import AgentRegistry, Resolution, DemographicCohort
+# FIX: Explicitly import SettlementRegistry to satisfy type hints and clear the NameError
+from civsim.settlements import SettlementRegistry
 
 CRISIS_POPULATION_THRESHOLD = 150  
 SPLIT_RATIO = 0.40                
