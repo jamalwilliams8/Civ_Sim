@@ -10,9 +10,14 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class SimConfig:
-    seed: int = 18472931          # master RNG seed — determinism depends on this
-    ticks_per_year: int = 1       # 1 tick = 1 year to start; we can change resolution later
-    starting_population: int = 20 # size of the founding group
+    # --- Master Engine Seeds ---
+    seed: int = 18472931          # Master RNG seed — determinism depends on this
+    ticks_per_year: int = 1       # 1 tick = 1 year baseline scale
+    
+    # --- Map Matrix Dimensions ---
+    world_width: int = 100        # Expanded map grid dimension width
+    world_height: int = 100       # Expanded map grid dimension height
+    starting_population: int = 50 # Larger founding group to settle a wider map
 
     def as_dict(self) -> dict:
         return self.__dict__.copy()

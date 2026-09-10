@@ -13,10 +13,12 @@ from civsim.settlements import SettlementRegistry, resolve_settlements
 
 
 class Simulation:
-    def __init__(self, config: SimConfig, width: int = 10, height: int = 10):
+    def __init__(self, config: SimConfig):
         self.config = config
         self.rng = SimRNG(config.seed)
-        self.world = World(width, height, self.rng.stream("world"))
+        
+        # Grid layout dimensions dynamically bound directly from SimConfig properties
+        self.world = World(config.world_width, config.world_height, self.rng.stream("world"))
         self.agents = AgentRegistry()
         self.settlements = SettlementRegistry()
         self.current_tick = 0
@@ -24,11 +26,13 @@ class Simulation:
         self._spawn_founding_population()
 
     def _spawn_founding_population(self) -> None:
+        """Positions the initialization generation near the map nexus quadrant."""
         spawn_rng = self.rng.stream("spawn")
         cx, cy = self.world.width // 2, self.world.height // 2
         for _ in range(self.config.starting_population):
-            x = min(max(cx + spawn_rng.randint(-2, 2), 0), self.world.width - 1)
-            y = min(max(cy + spawn_rng.randint(-2, 2), 0), self.world.height - 1)
+            # Safe bounding clamping against arbitrary grid map limits
+            x = min(max(cx + spawn_rng.randint(-5, 5), 0), self.world.width - 1)
+            y = min(max(cy + spawn_rng.randint(-5, 5), 0), self.world.height - 1)
             self.agents.create_agent(generation=0, x=x, y=y)
 
     def step(self) -> None:
