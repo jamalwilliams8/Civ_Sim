@@ -1,30 +1,29 @@
 ﻿"""
 civsim/governance.py
 Implements tribal leadership actions: commands overpopulated urban centers 
-to execute pioneer splits with O(1) index caching to eliminate CPU hang.
+to execute pioneer splits with explicit Phase 3 Cultural Drift mutations.
 """
 
 import random
-from civsim.agents import AgentRegistry, Resolution
-from civsim.settlements import SettlementRegistry
+from civsim.agents import AgentRegistry, Resolution, DemographicCohort
 
 CRISIS_POPULATION_THRESHOLD = 150  
 SPLIT_RATIO = 0.40                
 
 
-def resolve_governance_decisions(world, agents: AgentRegistry, settlements: SettlementRegistry, current_tick: int) -> None:
-    """Leaders audit local tile loads and execute political migration orders using optimized dictionaries."""
+def resolve_governance_decisions(world, agents: AgentRegistry, settlements: SettlementRegistry, current_tick: int, culture_registry=None) -> None:
+    """Leaders audit local tile loads and execute political migration orders using strict compression."""
     active_cities = [s for s in settlements.settlements.values() if s.active]
     if not active_cities:
         return
 
-    # 1. OPTIMIZATION: Map cohort loads by settlement ID in a single pass instead of nested loops
+    # Map cohort loads by settlement ID
     cohort_settlement_totals = {}
     for cohort in agents.cohorts.values():
         if cohort.settlement_id:
             cohort_settlement_totals[cohort.settlement_id] = cohort_settlement_totals.get(cohort.settlement_id, 0) + cohort.count
 
-    # 2. Map individual uncompressed agents by settlement ID in a single pass
+    # Map individual uncompressed agents by settlement ID
     indiv_settlement_totals = {}
     for agent in agents.living_agents():
         if agent.settlement_id:
@@ -46,6 +45,10 @@ def resolve_governance_decisions(world, agents: AgentRegistry, settlements: Sett
             new_colony = settlements.found_settlement(target_x, target_y, current_tick)
             colonies_founded_this_tick += 1
             
+            # Form a cultural drift mutation for the newly emerged colony node
+            if culture_registry is not None:
+                culture_registry.mutate_culture_for_split(city.id, new_colony.id)
+            
             target_migrants = int(total_load * SPLIT_RATIO)
             migrants_moved = 0
             
@@ -66,7 +69,12 @@ def resolve_governance_decisions(world, agents: AgentRegistry, settlements: Sett
                 if half_share > 0:
                     agents.cohorts[old_pos].count -= half_share
                     if new_pos not in agents.cohorts:
-                        agents.cohorts[new_pos] = DemographicCohort(x=target_x, y=target_y, generation=agents.cohorts[old_pos].generation, settlement_id=new_colony.id)
+                        agents.cohorts[new_pos] = DemographicCohort(
+                            x=target_x, 
+                            y=target_y, 
+                            generation=agents.cohorts[old_pos].generation, 
+                            settlement_id=new_colony.id
+                        )
                         agents.cohorts[new_pos].count = half_share
                     else:
                         agents.cohorts[new_pos].count += half_share
