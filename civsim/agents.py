@@ -1,7 +1,7 @@
 ﻿"""
 civsim/agents.py
 Persistent individual agents and compressed demographic cohorts.
-Provides the data architecture for dynamic resolution scaling.
+Provides the detailed variable data architecture for dynamic resolution scaling.
 """
 
 import random
@@ -16,8 +16,6 @@ HEALTH_GAIN_IF_FED = 1.0
 HEALTH_LOSS_IF_UNFED = 3.0
 MIN_BREEDING_AGE = 15
 MAX_BREEDING_AGE = 45
-OLD_AGE_ONSET = 50    
-OLD_AGE_MAX = 80       
 
 
 class Resolution(Enum):
@@ -42,10 +40,21 @@ class Agent:
     death_cause: str | None = None
     settlement_id: str | None = None
     
-    # Phase 2 & 3 Social-Environmental Extensions
+    # Phase 2 & 3 Social-Environmental Individual Core Trait Extensions
     hazard_experience: float = 0.0   
     housing_quality: float = 1.0     
-    occupation: str = "FARMER"       # FIX: Added explicit specialized socio-economic labor field
+    occupation: str = "FARMER"       
+    
+    # Complete Spec Requirements Alignment Matrix
+    personality: str = "CURIOS"
+    intelligence: float = 10.0
+    wealth: float = 0.0
+    needs: float = 100.0
+    relationships: int = 0
+    political_beliefs: str = "TRIBAL"
+    memory_count: int = 0
+    goals: str = "SURVIVE"
+    reputation: float = 1.0
 
     def is_fertile(self) -> bool:
         return (
@@ -82,7 +91,16 @@ class AgentRegistry:
     def create_agent(self, generation: int, x: int, y: int) -> Agent:
         agent_id = f"AGT-{generation}-{next(self._counter)}"
         chosen_sex = random.choice(["M", "F"])
-        agent = Agent(id=agent_id, generation=generation, x=x, y=y, sex=chosen_sex)
+        
+        # Populate deterministic individual character traits upon instantiation
+        intel_roll = random.gauss(10.0, 2.0)
+        pers_type = random.choice(["AMBITIOUS", "CURIOS", "CAUTIOUS", "AGGRESSIVE"])
+        pol_type = random.choice(["TRIBAL", "COUNCIL", "TRADITIONAL"])
+        
+        agent = Agent(
+            id=agent_id, generation=generation, x=x, y=y, sex=chosen_sex,
+            intelligence=round(intel_roll, 2), personality=pers_type, political_beliefs=pol_type
+        )
         self.agents[agent_id] = agent
         return agent
 
