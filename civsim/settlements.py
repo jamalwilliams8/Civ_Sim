@@ -26,6 +26,9 @@ class Settlement:
         self.defense_tier = "EARTHEN_DIKE"
         self.comfort_tier = "PRIMITIVE_CESSPOOLS"
         self.last_political_milestone = "NONE"
+        
+        # FIX: Natively initialize the missing leader tracking node properties
+        self.leader_id = None
 
 class SettlementRegistry:
     def __init__(self):
@@ -62,10 +65,10 @@ def resolve_settlements(agents, settlements, current_tick) -> None:
                 for agent in living:
                     if agent.x == pos[0] and agent.y == pos[1]:
                         agent.settlement_id = new_settlement.id
+
 # --- GEOGRAPHIC RADIAL UTILITIES ---
 SETTLEMENT_RADIUS = 3
 
 def _within_radius(x1, y1, x2, y2, radius=SETTLEMENT_RADIUS) -> bool:
     """Calculates if coordinates sit within a localized spatial territory boundary."""
     return abs(x1 - x2) <= radius and abs(y1 - y2) <= radius
-
