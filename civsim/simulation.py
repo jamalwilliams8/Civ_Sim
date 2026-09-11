@@ -1,7 +1,8 @@
 ﻿"""
 civsim/simulation.py
-Central execution engine managing sequential tick loops across environmental, 
-social, economic, governance, law, culture, occupations, defense, religion, libraries, and tech layers.
+Central execution engine managing sequential tick loops.
+Enforces strict chronological sequence: Lifecycles and demographic sweeps execute 
+BEFORE economic transactions and taxation to ensure persistent data tracking.
 """
 
 import random
@@ -17,7 +18,8 @@ from civsim.resources import resolve_resource_production
 from civsim.hazards import resolve_wilderness_hazards
 from civsim.infrastructure import resolve_housing_infrastructure
 from civsim.governance import resolve_governance_decisions
-from civsim.economy import resolve_economic_barter_trade
+from civsim.economy import resolve_market_economics
+from civsim.guilds import resolve_wealth_and_guild_factions  
 from civsim.law import resolve_social_friction_and_law
 from civsim.culture import CultureRegistry  
 from civsim.occupations import resolve_occupations          
@@ -77,31 +79,24 @@ class Simulation:
             
         pre_step_active = {s_id: s.active for s_id, s in self.settlements.settlements.items()}
 
-        # 1. Structural Movement & Settlements Pass 
+        # 1. Structural Spacial Positioning & Foundations Passes
         resolve_movement(self.world, self.agents, self.tech_registry)
         resolve_settlements(self.agents, self.settlements, self.current_tick)
         resolve_governance_decisions(self.world, self.agents, self.settlements, self.current_tick, self.culture_registry)
         
-        # 2. Labor & Military Loops
+        # 2. Labor Divisions & Military Incursions Modules
         resolve_occupations(self.agents, self.settlements)
         resolve_military_and_raiders(self.world, self.agents, self.settlements, self.current_tick)
         
-        # 3. Phase 3 Religion, Beliefs and Miracles
+        # 3. Ideological Beliefe Mutations & Miracle Phenonmena 
         resolve_miracles_and_belief(self.world, self.agents, self.settlements, self.current_tick)
         
-        # 4. Phase 2/4 Archive Libraries & Written Preservation Checks
-        resolve_libraries_and_preservation(self.agents, self.settlements, self.tech_registry)
-        
-        # 5. Economy & Law Enforcement Systems
-        resolve_economic_barter_trade(self.world, self.settlements)
-        resolve_social_friction_and_law(self.world, self.agents, self.settlements, self.current_tick)
-        
-        # 6. Environmental Upkeeps and Dynamic Carrying Capacities
+        # 4. Environmental Damage Extraction & Infrastructure
         resolve_wilderness_hazards(self.agents, self.settlements, self.current_tick)
         resolve_housing_infrastructure(self.agents, self.settlements)
         resolve_resource_production(self.world, self.agents, self.tech_registry)
         
-        # 7. Technological Innovation Tracking
+        # 5. Technology Innovation Progress Tree
         cohort_cache = {}
         for cohort in self.agents.cohorts.values():
             if cohort.settlement_id:
@@ -115,12 +110,22 @@ class Simulation:
             
         self.tech_registry.resolve_innovation(self.settlements, self.current_tick)
         
-        # 8. Demographic Consumption Lifecycles (FIX: Passing Tech Registry to evaluate farming multipliers)
+        # 6. Demographics Lifecycles Sweeps (Executed BEFORE market passes to secure arrays)
         resolve_food_and_health(self.world, self.agents)
         self.world.tick_ecosystem(self.agents, self.tech_registry)
         resolve_birth_and_death(self.agents, self.current_tick)
 
-        # 9. Graph Auditing Node Entries
+        # 7. FIX: Run Phase 3 Market Economy and Pricing Shocks Post-Demographics
+        resolve_market_economics(self.world, self.agents, self.settlements, self.current_tick)
+        
+        # 8. FIX: Run Phase 3 Coin Wealth Accruals, Progressive Taxes, and Guild Formations
+        resolve_wealth_and_guild_factions(self.world, self.agents, self.settlements, self.current_tick)
+        resolve_libraries_and_preservation(self.agents, self.settlements, self.tech_registry)
+        
+        # 9. Public Order Enforcement and Law Watch Duties
+        resolve_social_friction_and_law(self.world, self.agents, self.settlements, self.current_tick)
+
+        # 10. Graph Auditing Node Logging
         for s_id, s in self.settlements.settlements.items():
             if s_id not in pre_step_active:
                 cult = self.culture_registry.get_culture(s_id)
