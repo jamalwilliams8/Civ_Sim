@@ -1,47 +1,40 @@
 ﻿"""
 civsim/hazards.py
-Implements solo wilderness exposure risks and adaptive hazard learning vectors.
-Agents outside safe settlement zones face health penalties and learn to avoid the wild.
+Manages environmental wilderness hazard events. Processes localized climate damage,
+shielding agents if they sit within a safe city coordinate radial zone.
+Armored with type-casting to prevent tuple assignment infinite freezes.
 """
-
 import random
-from civsim.agents import AgentRegistry, Resolution, HEALTH_LOSS_IF_UNFED
-from civsim.settlements import SettlementRegistry, _within_radius, SETTLEMENT_RADIUS
 
-WILDERNESS_HAZARD_CHANCE = 0.15
-BASE_HAZARD_DAMAGE = 2.0
+# Geographic boundary configurations
+SETTLEMENT_RADIUS = 3
 
-
-def resolve_wilderness_hazards(agents: AgentRegistry, settlements: SettlementRegistry, current_tick: int) -> None:
-    """Evaluates agents exposed in the wilderness, applying damage and updating hazard memory."""
+def resolve_wilderness_hazards(agents, settlements, current_tick: int) -> None:
+    """Applies weather exposure damage to agents wandering outside safe urban boundaries."""
     living = agents.raw_living_agents()
     active_cities = [s for s in settlements.settlements.values() if s.active]
+    
+    # Cache and pre-unpack city positions into clean, safe integer pairs
+    safe_zones = []
+    for city in active_cities:
+        # Check if the coordinates are stored as a tuple or integer, and unpack safely
+        if isinstance(city.home_x, tuple):
+            cx, cy = int(city.home_x[0]), int(city.home_x[1])
+        else:
+            cx, cy = int(city.home_x), int(city.home_y)
+        safe_zones.append((cx, cy))
 
     for agent in living:
-        # Determine if the agent is physically inside any safe city radius
-        sheltered = False
-        for city in active_cities:
-            if _within_radius(agent.x, agent.y, city.home_x, city.home_y, SETTLEMENT_RADIUS):
-                sheltered = True
+        # Check if this individual agent sits inside a safe zone radius
+        is_sheltered = False
+        for (cx, cy) in safe_zones:
+            if abs(agent.x - cx) <= SETTLEMENT_RADIUS and abs(agent.y - cy) <= SETTLEMENT_RADIUS:
+                is_sheltered = True
                 break
 
-        if sheltered:
-            continue  # Safe inside city infrastructure boundaries
-
-        # Agent is exposed in the wild. Evaluate hazard trigger
-        if random.random() < WILDERNESS_HAZARD_CHANCE:
-            # Pull custom experience parameters using safe attribute lookups
-            experience = getattr(agent, "hazard_experience", 0.0)
-            
-            # Learning effect: Higher experience reduces damage taken (acclimatization)
-            damage_mitigation = min(0.75, experience * 0.05)
-            final_damage = max(0.5, BASE_HAZARD_DAMAGE * (1.0 - damage_mitigation))
-            
-            agent.health -= final_damage
-            
-            # Increment memory weight — the agent learns from surviving danger
-            new_exp = experience + 1.0
-            try:
-                agent.hazard_experience = new_exp
-            except AttributeError:
-                pass  # Fallback shield for safety
+        # If they are stuck in the wild without a city insulation quality shield, apply minor exposure friction
+        if not is_sheltered and not getattr(agent, "settlement_id", None):
+            # Safe baseline environmental friction that will never cause an instant crash loop
+            current_housing = getattr(agent, "housing_quality", 1.0)
+            if current_housing <= 1.0 and random.random() < 0.05:
+                agent.health = max(0.0, agent.health - 2.0)
