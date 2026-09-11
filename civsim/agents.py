@@ -1,13 +1,18 @@
 ﻿"""
 civsim/agents.py
 Core entity blueprint definition for individual simulation actors and cohort buckets.
-Contains system-wide survival thresholds and parameters.
+Contains system-wide survival thresholds, breeding ages, and health parameters.
 """
 import random
 
 # System configuration constants
 FOOD_NEED_PER_TICK = 1.0
 STARTING_HEALTH = 100.0
+MAX_HEALTH = 100.0
+HEALTH_GAIN_IF_FED = 5.0
+HEALTH_LOSS_IF_UNFED = 10.0
+MIN_BREEDING_AGE = 18
+MAX_BREEDING_AGE = 50
 
 class Resolution:
     INDIVIDUAL = 1
