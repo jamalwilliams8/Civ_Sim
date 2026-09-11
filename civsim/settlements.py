@@ -26,9 +26,10 @@ class Settlement:
         self.defense_tier = "EARTHEN_DIKE"
         self.comfort_tier = "PRIMITIVE_CESSPOOLS"
         self.last_political_milestone = "NONE"
-        
-        # FIX: Natively initialize the missing leader tracking node properties
         self.leader_id = None
+        
+        # FIX: Initialize the missing member tracking container list for technology checks
+        self.member_ids = []
 
 class SettlementRegistry:
     def __init__(self):
@@ -65,6 +66,9 @@ def resolve_settlements(agents, settlements, current_tick) -> None:
                 for agent in living:
                     if agent.x == pos[0] and agent.y == pos[1]:
                         agent.settlement_id = new_settlement.id
+                        # FIX: Cohesively append the agent's unique ID directly into the town array list
+                        if agent.id not in new_settlement.member_ids:
+                            new_settlement.member_ids.append(agent.id)
 
 # --- GEOGRAPHIC RADIAL UTILITIES ---
 SETTLEMENT_RADIUS = 3
