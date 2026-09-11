@@ -1,14 +1,14 @@
 ﻿"""
 civsim/simulation.py
-Central execution engine managing sequential tick loops across environmental, 
-political, banking, logistical market supply chains, labor, and tech layers.
+Central execution engine managing sequential tick loops across architectural layers.
+Optimized for high-velocity compilation by silencing verbose terminal text step outputs.
 """
 
 import random
 import time
 import copy
 from civsim.world import World
-from civsim.agents import Agent, AgentRegistry  # Reassembled Import Link Restored
+from civsim.agents import Agent, AgentRegistry  
 from civsim.settlements import SettlementRegistry, resolve_settlements
 from civsim.movement import resolve_movement
 from civsim.population import resolve_food_and_health, resolve_birth_and_death
@@ -88,56 +88,44 @@ class Simulation:
         # 2. Labor Divisions & Military Incursions Modules
         resolve_occupations(self.agents, self.settlements)
         resolve_military_and_raiders(self.world, self.agents, self.settlements, self.current_tick)
-        
-        # 3. Ideological Belief Mutations & Miracle Phenomena
         resolve_miracles_and_belief(self.world, self.agents, self.settlements, self.current_tick)
         
-        # 4. Environmental Damage Extraction & Infrastructure
+        # 3. Environmental Damage Extraction & Infrastructure
         resolve_wilderness_hazards(self.agents, self.settlements, self.current_tick)
         resolve_housing_infrastructure(self.agents, self.settlements)
         resolve_resource_production(self.world, self.agents, self.tech_registry)
         
-        # 5. Technology Innovation Progress Tree
+        # 4. Technology Innovation Progress Tree
         cohort_cache = {}
         for cohort in self.agents.cohorts.values():
             if cohort.settlement_id:
                 cohort_cache[cohort.settlement_id] = cohort_cache.get(cohort.settlement_id, 0) + cohort.count
 
         for s_id, settlement in self.settlements.settlements.items():
-            if not settlement.active:
-                continue
+            if not settlement.active: continue
             state = self.tech_registry.get_state(s_id)
             state.knowledge += cohort_cache.get(s_id, 0) * 0.05
             
         self.tech_registry.resolve_innovation(self.settlements, self.current_tick)
         
-        # 6. Demographics Lifecycles Sweeps 
+        # 5. Demographics Lifecycles Sweeps
         resolve_food_and_health(self.world, self.agents)
         self.world.tick_ecosystem(self.agents, self.tech_registry)
-        resolve_birth_and_death(self.agents, self.current_tick)
+        resolve_birth_and_death(self.agents, self.current_tick, self.settlements)
 
-        # 7. Phase 3 Market Economy and Pricing Shocks
+        # 6. Phase 3 Market Economy and Pricing Shocks
         resolve_market_economics(self.world, self.agents, self.settlements, self.current_tick)
-        
-        # 8. Phase 3 Coin Wealth Accruals, Progressive Taxes, and Guild Formations
         resolve_wealth_and_guild_factions(self.world, self.agents, self.settlements, self.current_tick)
         resolve_libraries_and_preservation(self.agents, self.settlements, self.tech_registry)
         
-        # 9. Phase 3 Inter-City Merchant Caravan Fleets and Sales Taxes
+        # 7. Phase 3 Inter-City Merchant Caravan Fleets and Sales Taxes
         resolve_merchant_caravans(self.world, self.agents, self.settlements, self.current_tick)
-        
-        # 10. Phase 3 Dynamic Political Typologies and Central Banking Engines
         resolve_politics_and_central_banks(self.world, self.agents, self.settlements, self.current_tick)
-        
-        # 11. Public Order Enforcement and Law Watch Duties
         resolve_social_friction_and_law(self.world, self.agents, self.settlements, self.current_tick)
 
-        # 12. Graph Auditing Node Logging
+        # 8. Graph Auditing Node Logging
         for s_id, s in self.settlements.settlements.items():
-            if s_id not in pre_step_active:
-                cult = self.culture_registry.get_culture(s_id)
-                self.history.record_event(self.current_tick, "FOUNDING", s.home_x, s.home_y, f"The {cult} settlement of {s.name} was established.")
-            elif pre_step_active[s_id] and not s.active:
+            if pre_step_active.get(s_id, False) and not s.active:
                 self.history.record_event(self.current_tick, "ABANDONMENT", s.home_x, s.home_y, f"The settlement of {s.name} faded into historical ruins.")
 
     def fork_branch(self):
