@@ -1,12 +1,14 @@
 ﻿"""
 civsim/simulation.py
 Central execution engine managing sequential tick loops across architectural layers.
-Optimized for high-velocity compilation by silencing verbose terminal text step outputs.
+Production Version: Armored with a real-time progress bar and a live dashboard telemetry pipeline.
 """
 
+import os
 import random
 import time
 import copy
+import sys
 from civsim.world import World
 from civsim.agents import Agent, AgentRegistry  
 from civsim.settlements import SettlementRegistry, resolve_settlements
@@ -28,6 +30,9 @@ from civsim.military import resolve_military_and_raiders
 from civsim.religion import resolve_miracles_and_belief     
 from civsim.library import resolve_libraries_and_preservation  
 from civsim.history import CausalityEngine  
+
+# LIVE DASHBOARD PIPELINE HOOK
+from civsim.civisim_GUI import civisim_GUI
 
 
 class Simulation:
@@ -128,13 +133,32 @@ class Simulation:
             if pre_step_active.get(s_id, False) and not s.active:
                 self.history.record_event(self.current_tick, "ABANDONMENT", s.home_x, s.home_y, f"The settlement of {s.name} faded into historical ruins.")
 
-    def fork_branch(self):
-        return copy.deepcopy(self)
-
     def run(self, ticks: int) -> None:
         start_time = time.time()
-        for _ in range(ticks):
+        print(f"⌛ Advancing simulation matrix across time dimensions...")
+        
+        # Establish structural relative path parameters for JSON outputs
+        subfolder_path = os.path.dirname(__file__)
+        out_file = os.path.join(subfolder_path, "rundata.json")
+
+        for i in range(ticks):
             self.step()
+            
+            # --- Updated safe hook execution signature ---
+            civisim_GUI(out_path=out_file)
+
+            
+            # --- REAL-TIME VISUAL PROGRESS BAR ---
+            if (i + 1) % 10 == 0 or (i + 1) == ticks:
+                percent = int(((i + 1) / ticks) * 100)
+                bar = "█" * (percent // 5) + "░" * (20 - (percent // 5))
+                sys.stdout.write(f"\r Progress: [{bar}] {percent}% | Simulated: Year {self.current_tick}/{ticks}")
+                sys.stdout.flush()
+                
+            # Optional: Add small sleep pacing if engine calculates ticks faster than browser can update layout canvas
+            time.sleep(0.01)
+                
+        print("\n Processing final data scorecard layouts...\n")
         elapsed = time.time() - start_time
         summary = self.get_summary()
         print(f"✓ Advanced time matrix by {ticks} ticks in {elapsed:.2f}s | Final Population: {summary['combined_population']} | Active Domains: {summary['active_settlements']}.")

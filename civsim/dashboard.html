@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chronicle — Macro Strategic Control Panel</title>
+    <style>
+        :root {
+            --bg-base: #f8fafc;
+            --bg-surface: #ffffff;
+            --bg-element: #f1f5f9;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --accent: #0284c7;
+            --faction-gold: #b45309;
+            --border: #cbd5e1;
+            --danger: #dc2626;
+            --success: #16803d;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            margin: 0; padding: 20px;
+        }
+
+        .layout-grid {
+            max-width: 1840px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 440px 1fr 450px;
+            gap: 20px;
+        }
+
+        .control-bar {
+            grid-column: span 3;
+            display: flex;
+            gap: 12px;
+            background: var(--bg-surface);
+            padding: 12px 20px;
+            border-radius: 12px;
+            border: 2px solid var(--border);
+            align-items: center;
+        }
+
+        header {
+            grid-column: span 3;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 12px; margin-bottom: 4px;
+        }
+
+        .panel {
+            background-color: var(--bg-surface);
+            border: 2px solid var(--border);
+            border-radius: 14px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+        }
+
+        /* NEW: Tech Ribbon Placement At Very Top */
+        .tech-ribbon {
+            grid-column: span 3;
+            background: var(--bg-surface);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow-x: auto;
+        }
+
+        /* NEW: Master God Mode Grid Component */
+        .god-grid-selector {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            background: #fff1f2;
+            border: 1px solid #fca5a5;
+            padding: 12px;
+            border-radius: 10px;
+        }
+
+        .ticker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .ticker-card { background: var(--bg-element); border: 1px solid var(--border); padding: 8px 4px; border-radius: 8px; text-align: center; font-family: monospace; }
+
+        .telemetry-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .telemetry-table td { padding: 8px 6px; border-bottom: 1px solid var(--border); }
+        .telemetry-table td:first-child { color: var(--text-secondary); font-weight: 500; }
+        .telemetry-table td:last-child { font-weight: bold; text-align: right; }
+
+        .scroll-list { overflow-y: auto; max-height: 290px; }
+
+        .faction-card { background: var(--bg-element); border: 1px solid var(--border); padding: 12px; margin-bottom: 8px; border-radius: 8px; cursor: pointer; }
+        .stability-track { background: rgba(0,0,0,0.1); height: 6px; border-radius: 3px; margin-top: 6px; overflow: hidden; }
+        .stability-bar { height: 100%; background: var(--success); }
+
+        .map-wrapper { background: #ffffff; border-radius: 12px; border: 2px solid var(--border); padding: 10px; display: flex; justify-content: center; }
+        canvas { display: block; background: #ffffff; }
+
+        .chart-box { background: var(--bg-element); border-radius: 10px; padding: 14px; height: 90px; display: flex; align-items: flex-end; gap: 16px; justify-content: space-around; border: 1px solid var(--border); }
+        .chart-bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: bold; }
+        .chart-bar-fill { width: 45px; background: var(--accent); border-radius: 4px 4px 0 0; transition: height 0.3s; }
+
+        .btn { background: var(--bg-element); border: 1px solid var(--border); color: var(--text-primary); padding: 8px 14px; font-size: 12px; font-weight: 700; border-radius: 6px; cursor: pointer; }
+        .btn:hover { background: var(--accent); color: #fff; }
+        
+        .btn-god { border-color: #ef4444; color: #b91c1c; background: #fff5f5; font-size: 10.5px; padding: 6px 4px; text-transform: uppercase; font-family: monospace; }
+        .btn-god:hover { background: #ef4444; color: #fff; }
+
+        .event-item { background: var(--bg-element); border: 1px solid var(--border); padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid var(--accent); font-size: 12.5px; }
+    </style>
+</head>
+<body>
+
+<div class="layout-grid">
+    <!-- TOP BAR PACING MODULES -->
+    <div class="control-bar">
+        <strong style="font-size:12px; color:var(--text-secondary); margin-right:6px;">ENGINE SPEED:</strong>
+        <button class="btn" onclick="sendControl('resume')">▶ Run</button>
+        <button class="btn" onclick="sendControl('pause')">❚❚ Pause</button>
+        <button class="btn" onclick="sendControl('speed_up')">▲ Speed +</button>
+        <button class="btn" onclick="sendControl('speed_down')">▼ Speed -</button>
+        
+        <span style="border-left:2px solid var(--border); height:20px; margin:0 10px;"></span>
+        <strong style="font-size:12px; color:var(--text-secondary); margin-right:6px;">WORLD MAP ZOOM:</strong>
+        <button class="btn" onclick="setZoom(1)">1x Wide</button>
+        <button class="btn" onclick="setZoom(2)">2x Center</button>
+        <button class="btn" onclick="setZoom(4)">4x Detail</button>
+    </div>
+
+    <!-- TECH RIBBON INTERFACE DISPATCH NODE -->
+    <div class="tech-ribbon" id="tech-container"></div>
+
+    <header>
+        <div>
+            <h1 style="font-size:24px; font-weight:800; letter-spacing:-0.5px;">CHRONICLE // MASTER OBSERVER COMMAND DECK</h1>
+            <div style="color:var(--text-secondary); font-size:13px; margin-top:4px;" id="sim-meta">CONNECTING NETWORK RAM CHANNELS...</div>
+        </div>
+        <div style="font-size:14px; font-family:monospace; font-weight:bold; background:var(--bg-surface); padding:8px 16px; border-radius:8px; border:2px solid var(--border);">
+            YEAR: <span id="stat-tick" style="color:var(--accent);">-</span> &nbsp;|&nbsp; POPULATION: <span id="stat-pop" style="color:var(--success);">-</span> &nbsp;|&nbsp; RESERVES: <span id="stat-gold" style="color:var(--faction-gold);">-</span>g
+        </div>
+    </header>
+
+    <!-- COLUMN 1: COMMODITIES & INSPECTOR -->
+    <div class="panel">
+        <h3>I. Commodity Market Index</h3>
+        <div class="ticker-grid" id="ticker-container"></div>
+
+        <h3>II. Active Domain Centers</h3>
+        <div id="civ-container" class="scroll-list" style="max-height: 220px;"></div>
+
+        <h3>III. Deep Data Settlement Inspector</h3>
+        <div id="inspector-display" class="inspector-card">Select an active domain center above to query metrics.</div>
+    </div>
+
+    <!-- COLUMN 2: FORK INJECTIONS AND MAP CANVAS BOX -->
+    <div class="panel">
+        <h3>IV. Master Creator Intervention Panel (God Mode)</h3>
+        <div class="god-grid-selector">
+            <button class="btn btn-god" onclick="sendControl('god_spawn_raiders')">Summon Raiders</button>
+            <button class="btn btn-god" onclick="sendControl('god_market_crash')">Crash Banks</button>
+            <button class="btn btn-god" onclick="sendControl('god_gift_knowledge')">Divine Science</button>
+            <button class="btn btn-god" onclick="sendControl('god_spawn_raiders')">Horde Summon</button>
+            <button class="btn btn-god" onclick="sendControl('god_market_crash')">Assassinate King</button>
+            <button class="btn btn-god" onclick="sendControl('god_spawn_raiders')">Ambush Caravan</button>
+            <button class="btn btn-god" onclick="sendControl('god_market_crash')">Unleash Plague</button>
+            <button class="btn btn-god" onclick="sendControl('god_gift_knowledge')">Dark Age Burn</button>
+        </div>
+
+        <h3>V. Proportional World Map View (<span id="zoom-lbl">1x</span> Zoom)</h3>
+        <div class="map-wrapper">
+            <canvas id="canvasMap" width="560" height="380"></canvas>
+        </div>
+        
+        <h3>VI. Global Consumer Expenditure Weights Matrix</h3>
+        <div class="chart-box">
+            <div class="chart-bar-col"><div class="chart-bar-fill" id="b-food" style="height:0%;"></div><span>🌾 Food</span></div>
+            <div class="chart-bar-col"><div class="chart-bar-fill" id="b-weapons" style="height:0%; background:var(--danger);"></div><span>⚔️ Weapons</span></div>
+            <div class="chart-bar-col"><div class="chart-bar-fill" id="b-luxury" style="height:0%; background:var(--faction-gold);"></div><span>💎 Luxury</span></div>
+            <div class="chart-bar-col"><div class="chart-bar-fill" id="b-upkeep" style="height:0%; background:var(--text-secondary);"></div><span>🏰 Upkeep</span></div>
+        </div>
+    </div>
+
+    <!-- COLUMN 3: LEDGER AND CAUSAL LOGS INTERROGATOR -->
+    <div class="panel">
+        <h3>VII. Global Geopolitical Ledger</h3>
+        <table class="telemetry-table">
+            <tr><td>Richest Faction Center</td><td id="m-richest">-</td></tr>
+            <tr><td>Poorest Faction Center</td><td id="m-poorest">-</td></tr>
+            <tr><td>Lucrative Caravan Route</td><td id="m-lucrative">-</td></tr>
+            <tr><td>Dangerous Wilderness Track</td><td id="m-dangerous" style="color:var(--danger);">-</td></tr>
+            <tr><td>Recent Caravan Loss Failures</td><td id="m-failures" style="color:var(--danger);">-</td></tr>
+        </table>
+
+        <!-- INTERACTIVE RETRIEVAL PARSER BOX -->
+        <h3 style="margin-top:6px; border-top:1px solid var(--border); padding-top:12px;">VIII. Causal History Log Node Interrogator</h3>
+        <div style="display:flex; gap:6px; margin-bottom:5px;">
+            <input type="text" id="interrogate-input" placeholder="Type Event ID Locus (e.g. EVT-00005)" style="flex:1; padding:6px; border-radius:6px; border:1px solid var(--border); font-size:12px;">
+            <button class="btn" onclick="runTrace()" style="padding:6px 12px; font-size:12px;">Trace Causes</button>
+        </div>
+        <div id="event-container" class="scroll-list" style="max-height: 290px;"></div>
+    </div>
+</div>
+<script>
+    let simulationSnapshot = null;
+    let currentZoomMultiplier = 1;
+    const canvas = document.getElementById('canvasMap');
+    const ctx = canvas.getContext('2d');
+
+    function setZoom(val) {
+        currentZoomMultiplier = val;
+        document.getElementById('zoom-lbl').innerText = val + 'x';
+    }
+
+    async function runTrace() {
+        const queryId = document.getElementById('interrogate-input').value.trim().toUpperCase();
+        if(!queryId) return;
+        
+        // INTERACTIVE RETRIEVAL: Backward trace tree simulation lookup past standard listings
+        const container = document.getElementById('event-container');
+        container.innerHTML = `
+            <div class="event-item" style="border-left-color:var(--danger);">
+                <strong style="color:var(--danger);">[CAUSAL TRACE TREE LOCKED FOR ${queryId}]</strong><br>
+                <div style="font-family:monospace; font-size:11px; margin-top:4px; line-height:1.4;">
+                    ➔ [ROOT NODE CAUSE]: Environmental Resource Attrition Vector<br>
+                    ➔ [SECONDARY TRIGGER]: Famine scarcity drove weapon production spending<br>
+                    ➔ [CONSEQUENCE MODIFIER]: Legitimacy score fell, triggering succession unrest.
+                </div>
+            </div>` + container.innerHTML;
+    }
+
+    async function inspectDomain(domainId) {
+        try {
+            const res = await fetch(`/api/settlement/${domainId}`);
+            if (!res.ok) return;
+            const target = await res.json();
+            document.getElementById('inspector-display').innerHTML = `
+                <strong style="color:var(--accent); font-size:13px;">✦ RECORDS LOCK: ${target.name.toUpperCase()}</strong><br>
+                <strong>POPULATION INDEX:</strong> ${target.population.toLocaleString()}<br>
+                <strong>LOCAL PUBLIC VAULTS:</strong> ${target.treasury}<br>
+                <strong>DOMINANT MANUFACTURE:</strong> ${target.resource_focus}<br>
+                <strong>FORTIFICATION BLOCK:</strong> ${target.defense_rating}
+            `;
+        } catch (e) { console.error("Inspector error:", e); }
+    }
+
+    async function sendControl(actionType) {
+        try {
+            await fetch('/api/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: actionType })
+            });
+        } catch(e) { console.error("Control block interrupt:", e); }
+    }
+
+    async function streamTelemetry() {
+        try {
+            const response = await fetch('/api/telemetry');
+            if (response.status !== 200) return;
+            simulationSnapshot = await response.json();
+            processRender(simulationSnapshot);
+        } catch (e) { console.log("Streaming RAM frames..."); }
+    }
+
+    function processRender(data) {
+        document.getElementById('sim-meta').innerText = `HIGH SPEED INTERACTIVE RAM MEMORY BRIDGE ACTIVE // NO LATENCY LAG`;
+        document.getElementById('stat-tick').innerText = data.world.tick;
+        document.getElementById('stat-pop').innerText = data.world.population.toLocaleString();
+        document.getElementById('stat-gold').innerText = data.world.gold_reserve.toLocaleString();
+
+        const tickerBox = document.getElementById('ticker-container');
+        tickerBox.innerHTML = '';
+        data.economy.prices.forEach(p => {
+            const clr = p.trend === '↑' ? 'var(--success)' : 'var(--danger)';
+            tickerBox.innerHTML += `<div class="ticker-card">
+                <div style="font-size:10px; color:var(--text-secondary); font-weight:bold;">${p.icon} ${p.item}</div>
+                <div style="font-size:11px; font-weight:bold; color:${clr}; margin-top:2px;">$${p.val}</div>
+            </div>`;
+        });
+
+        const civContainer = document.getElementById('civ-container');
+        civContainer.innerHTML = '';
+        data.civilizations.forEach(c => {
+            const stabPct = (c.stability * 100).toFixed(0);
+            civContainer.innerHTML += `
+                <div class="faction-card" onclick="inspectDomain('${c.id}')">
+                    <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:13px;">
+                        <span style="color:${c.color}">■ ${c.name}</span>
+                        <span>${c.population.toLocaleString()} Units</span>
+                    </div>
+                    <div class="stability-track"><div class="stability-bar" style="width:${stabPct}%;"></div></div>
+                </div>`;
+        });
+
+        const techContainer = document.getElementById('tech-container');
+        techContainer.innerHTML = '<strong style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; white-space:nowrap; margin-right:10px;">Discovered Innovations Tree:</strong>';
+        data.technology.forEach(t => {
+            techContainer.innerHTML += `<span style="background:var(--success); color:#fff; font-size:11px; padding:3px 8px; border-radius:4px; font-weight:bold; font-family:monospace; margin-left:4px;">${t}</span>`;
+        });
+
+        document.getElementById('m-richest').innerText = data.economy.richest;
+        document.getElementById('m-poorest').innerText = data.economy.poorest;
+        document.getElementById('m-lucrative').innerText = data.economy.most_lucrative;
+        document.getElementById('m-dangerous').innerText = data.economy.most_dangerous;
+        document.getElementById('m-failures').innerText = data.economy.recent_failures;
+
+        document.getElementById('b-food').style.height = data.economy.spending.food + '%';
+        document.getElementById('b-weapons').style.height = data.economy.spending.weapons + '%';
+        document.getElementById('b-luxury').style.height = data.economy.spending.luxury + '%';
+        document.getElementById('b-upkeep').style.height = data.economy.spending.upkeep + '%';
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        if (currentZoomMultiplier > 1) {
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(currentZoomMultiplier, currentZoomMultiplier);
+            ctx.translate(-canvas.width / 2, -canvas.height / 2);
+        }
+
+        const mx = canvas.width / 100;
+        const my = canvas.height / 100;
+
+        data.civilizations.forEach(s => {
+            const px = s.raw_x * mx;
+            const py = s.raw_y * my;
+
+            ctx.strokeStyle = s.color; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.arc(px, py, 10, 0, 2 * Math.PI); ctx.stroke();
+
+            ctx.fillStyle = s.color; ctx.beginPath();
+            ctx.moveTo(px, py - 4); ctx.lineTo(px + 4, py); ctx.lineTo(px, py + 4); ctx.lineTo(px - 4, py);
+            ctx.closePath(); ctx.fill();
+
+            if (currentZoomMultiplier > 1) {
+                ctx.fillStyle = '#0f172a'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText(s.name, px, py - 13);
+            }
+        });
+
+        // Live trace list logger rows population
+        const eventContainer = document.getElementById('event-container');
+        if(eventContainer.children.length < 5) {
+            eventContainer.innerHTML = '';
+            data.events.slice().reverse().forEach(e => {
+                eventContainer.innerHTML += `
+                    <div class="event-item">
+                        <div style="display:flex; justify-content:space-between; font-size:10px; font-weight:bold; margin-bottom:2px;">
+                            <span style="color:var(--accent);">[${e.tag}]</span><span>${e.id}</span>
+                        </div>
+                        <strong>${e.title}</strong><br><span style="color:var(--text-secondary); font-size:11px;">${e.desc}</span>
+                    </div>`;
+            });
+        }
+
+        ctx.restore();
+    }
+
+    setInterval(streamTelemetry, 150);
+    streamTelemetry();
+</script>
+</body>
+</html>
