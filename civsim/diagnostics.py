@@ -80,25 +80,25 @@ def report(world: World, agents: AgentRegistry, settlements: SettlementRegistry,
 
 def print_history_book(report_data: dict) -> None:
     print('====================================================')
-    print(f'        WORLD HISTORY CHRONICLE - YEAR {report_data["ticks_run"]}')
+    print(f"        WORLD HISTORY CHRONICLE - YEAR {report_data['ticks_run']}")
     print('====================================================')
-    print(f'Global Climate State  : {report_data["current_climate"]}')
-    print(f'Total Combined Population: {report_data["living_population"]}')
-    print(f'Global Cemetery Count  : {report_data["historical_dead_count\"]}')
-    print(f'Mortality Records: {report_data["death_causes"]}\\n')
+    print(f"Global Climate State  : {report_data['current_climate']}")
+    print(f"Total Combined Population: {report_data['living_population']}")
+    print(f"Global Cemetery Count  : {report_data['historical_dead_count']}")
+    print(f"Mortality Records: {report_data['death_causes']}\n")
     
-    print(f'--- ACTIVE CIVILIZATIONS ({report_data["settlements"]["active_count"]}) ---')
+    print(f"--- ACTIVE CIVILIZATIONS ({report_data['settlements']['active_count']}) ---")
     for city in report_data['settlements']['active_details']:
-        lib_text = f'YES ({city["library_books"]} texts)' if city['has_library'] else 'NONE'
-        coup_txt = f' | Coup Record: {city["coup_milestone"]}' if city['coup_milestone'] != 'NONE' else ''
+        lib_text = f"YES ({city['library_books']} texts)" if city['has_library'] else 'NONE'
+        coup_txt = f" | Coup Record: {city['coup_milestone']}" if city['coup_milestone'] != 'NONE' else ''
         
-        print(f' * The Domain of {city["name"]} at {city["coordinates"]} | Citizens: {city["current_population"]}')
-        print(f'   [Political Regime] Type: {city["regime"]}{coup_txt} | Walls Class: {city["defense_class"]} ({city["fortifications"]} pts)')
-        print(f'   [Central Banking ] System: {city["bank_status"]} | Active Credit Loans: {city["loans"]} | Status: {city["bank_action"]}')
-        print(f'   [Public Treasury ] Accumulated Fund: {city["treasury"]} coins | Mode: PROGRESSIVE_TAX_POOL')
-        print(f'   [Market Economy  ] System: {city["economy"]} | Food Price Index: {city["price_index"]}x | Inflation: {city["inflation"]}%')
-        print(f'   [Labor Registry  ] Avg Net Worth: {city["avg_nw"]} coins | Master Smiths: {city["guild_craft"]} | Apprentices: {city["apprentices"]} | Smugglers: {city["smugglers"]}')
-        print(f'   [Knowledge Hub   ] Institutional Archive Library: {lib_text} | Miracle: {city["miracle_status"]}')
+        print(f" * The Domain of {city['name']} at {city['coordinates']} | Citizens: {city['current_population']}")
+        print(f"   [Political Regime] Type: {city['regime']}{coup_txt} | Walls Class: {city['defense_class']} ({city['fortifications']} pts)")
+        print(f"   [Central Banking ] System: {city['bank_status']} | Active Credit Loans: {city['loans']} | Status: {city['bank_action']}")
+        print(f"   [Public Treasury ] Accumulated Fund: {city['treasury']} coins | Mode: PROGRESSIVE_TAX_POOL")
+        print(f"   [Market Economy  ] System: {city['economy']} | Food Price Index: {city['price_index']}x | Inflation: {city['inflation']}%")
+        print(f"   [Labor Registry  ] Avg Net Worth: {city['avg_nw']} coins | Master Smiths: {city['guild_craft']} | Apprentices: {city['apprentices']} | Smugglers: {city['smugglers']}")
+        print(f"   [Knowledge Hub   ] Institutional Archive Library: {lib_text} | Miracle: {city['miracle_status']}")
         print("")
         
     print('====================================================')
