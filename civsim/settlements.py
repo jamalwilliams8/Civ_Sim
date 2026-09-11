@@ -62,3 +62,10 @@ def resolve_settlements(agents, settlements, current_tick) -> None:
                 for agent in living:
                     if agent.x == pos[0] and agent.y == pos[1]:
                         agent.settlement_id = new_settlement.id
+# --- GEOGRAPHIC RADIAL UTILITIES ---
+SETTLEMENT_RADIUS = 3
+
+def _within_radius(x1, y1, x2, y2, radius=SETTLEMENT_RADIUS) -> bool:
+    """Calculates if coordinates sit within a localized spatial territory boundary."""
+    return abs(x1 - x2) <= radius and abs(y1 - y2) <= radius
+
