@@ -5,35 +5,30 @@ against catastrophic historical regression waves.
 """
 
 from collections import defaultdict
-from civsim.agents import AgentRegistry
 
-LIBRARY_LABOR_REQUIREMENT = 10.0
-
-
-def resolve_libraries_and_preservation(agents: AgentRegistry, settlements, tech_registry) -> None:
+def resolve_libraries_and_preservation(agents, settlements, tech_registry) -> None:
     """Processes infrastructure building maintenance loops for library book archives."""
     active_cities = [s for s in settlements.settlements.values() if s.active]
     if not active_cities:
         return
 
-    # Track blacksmith craft volumes per city node via direct pass
-    smith_counts = defaultdict(int)
-    for agent in agents.raw_living_agents():
-        if agent.settlement_id and getattr(agent, "occupation", "FARMER") == "BLACKSMITH":
-            smith_counts[agent.settlement_id] += 1
+    # Track city populations across cohorts
+    city_pops = defaultdict(int)
+    for cohort in agents.cohorts.values():
+        if getattr(cohort, "settlement_id", None):
+            city_pops[cohort.settlement_id] += cohort.count
 
     for city in active_cities:
-        num_smiths = smith_counts.get(city.id, 0)
+        pop = city_pops.get(city.id, 0)
         has_library = getattr(city, "has_archive_library", False)
 
-        if not has_library and num_smiths >= 5:
-            # Blacksmiths forge preservation tools: Build a Library
+        # Settlements construct libraries when their specialized population hits a stable footprint
+        if not has_library and pop >= 30:
             setattr(city, "has_archive_library", True)
-            
-            # Log archive creation inside our history tracking registry channels
-            tech_state = tech_registry.get_state(city.id)
-            setattr(city, "library_volume_count", len(tech_state.unlocked_techs))
+            setattr(city, "library_volume_count", 3)
         elif has_library:
             tech_state = tech_registry.get_state(city.id)
-            # Sync the library archives capacity to hold newly discovered techs
-            setattr(city, "library_volume_count", len(tech_state.unlocked_techs))
+            setattr(city, "library_volume_count", max(1, len(tech_state.unlocked_techs)))
+        else:
+            setattr(city, "has_archive_library", False)
+            setattr(city, "library_volume_count", 0)
