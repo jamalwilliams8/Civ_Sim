@@ -1,8 +1,7 @@
 ﻿"""
 civsim/simulation.py
-Central execution engine managing sequential tick loops.
-Enforces strict chronological sequence: Lifecycles and demographic sweeps execute 
-BEFORE economic transactions and taxation to ensure persistent data tracking.
+Central execution engine managing sequential tick loops across environmental, 
+political, banking, market, labor, and tech layers under absolute determinism.
 """
 
 import random
@@ -20,6 +19,7 @@ from civsim.infrastructure import resolve_housing_infrastructure
 from civsim.governance import resolve_governance_decisions
 from civsim.economy import resolve_market_economics
 from civsim.guilds import resolve_wealth_and_guild_factions  
+from civsim.governance_types import resolve_politics_and_central_banks 
 from civsim.law import resolve_social_friction_and_law
 from civsim.culture import CultureRegistry  
 from civsim.occupations import resolve_occupations          
@@ -88,7 +88,7 @@ class Simulation:
         resolve_occupations(self.agents, self.settlements)
         resolve_military_and_raiders(self.world, self.agents, self.settlements, self.current_tick)
         
-        # 3. Ideological Beliefe Mutations & Miracle Phenonmena 
+        # 3. Ideological Belief Mutations & Miracle Phenomena
         resolve_miracles_and_belief(self.world, self.agents, self.settlements, self.current_tick)
         
         # 4. Environmental Damage Extraction & Infrastructure
@@ -110,22 +110,25 @@ class Simulation:
             
         self.tech_registry.resolve_innovation(self.settlements, self.current_tick)
         
-        # 6. Demographics Lifecycles Sweeps (Executed BEFORE market passes to secure arrays)
+        # 6. Demographics Lifecycles Sweeps 
         resolve_food_and_health(self.world, self.agents)
         self.world.tick_ecosystem(self.agents, self.tech_registry)
         resolve_birth_and_death(self.agents, self.current_tick)
 
-        # 7. FIX: Run Phase 3 Market Economy and Pricing Shocks Post-Demographics
+        # 7. Phase 3 Market Economy and Pricing Shocks
         resolve_market_economics(self.world, self.agents, self.settlements, self.current_tick)
         
-        # 8. FIX: Run Phase 3 Coin Wealth Accruals, Progressive Taxes, and Guild Formations
+        # 8. Phase 3 Coin Wealth Accruals, Progressive Taxes, and Guild Formations
         resolve_wealth_and_guild_factions(self.world, self.agents, self.settlements, self.current_tick)
         resolve_libraries_and_preservation(self.agents, self.settlements, self.tech_registry)
         
-        # 9. Public Order Enforcement and Law Watch Duties
+        # 9. Dynamic Political Typologies and Central Banking Engines
+        resolve_politics_and_central_banks(self.world, self.agents, self.settlements, self.current_tick)
+        
+        # 10. Public Order Enforcement and Law Watch Duties
         resolve_social_friction_and_law(self.world, self.agents, self.settlements, self.current_tick)
 
-        # 10. Graph Auditing Node Logging
+        # 11. Graph Auditing Node Logging
         for s_id, s in self.settlements.settlements.items():
             if s_id not in pre_step_active:
                 cult = self.culture_registry.get_culture(s_id)
