@@ -1,14 +1,15 @@
 ﻿"""
 civsim/simulation.py
 Central execution engine managing sequential tick loops across environmental, 
-political, banking, market, labor, and tech layers under absolute determinism.
+political, banking, logistical market supply chains, labor, and tech layers.
 """
 
 import random
 import time
 import copy
 from civsim.world import World
-from civsim.agents import AgentRegistry
+from civsim.agents import Agent
+from civsim.agent_registry import AgentRegistry # Safe Modular Import Linked Here
 from civsim.settlements import SettlementRegistry, resolve_settlements
 from civsim.movement import resolve_movement
 from civsim.population import resolve_food_and_health, resolve_birth_and_death
@@ -20,6 +21,7 @@ from civsim.governance import resolve_governance_decisions
 from civsim.economy import resolve_market_economics
 from civsim.guilds import resolve_wealth_and_guild_factions  
 from civsim.governance_types import resolve_politics_and_central_banks 
+from civsim.logistics import resolve_merchant_caravans          
 from civsim.law import resolve_social_friction_and_law
 from civsim.culture import CultureRegistry  
 from civsim.occupations import resolve_occupations          
@@ -122,13 +124,16 @@ class Simulation:
         resolve_wealth_and_guild_factions(self.world, self.agents, self.settlements, self.current_tick)
         resolve_libraries_and_preservation(self.agents, self.settlements, self.tech_registry)
         
-        # 9. Dynamic Political Typologies and Central Banking Engines
+        # 9. Phase 3 Inter-City Merchant Caravan Fleets and Sales Taxes
+        resolve_merchant_caravans(self.world, self.agents, self.settlements, self.current_tick)
+        
+        # 10. Phase 3 Dynamic Political Typologies and Central Banking Engines
         resolve_politics_and_central_banks(self.world, self.agents, self.settlements, self.current_tick)
         
-        # 10. Public Order Enforcement and Law Watch Duties
+        # 11. Public Order Enforcement and Law Watch Duties
         resolve_social_friction_and_law(self.world, self.agents, self.settlements, self.current_tick)
 
-        # 11. Graph Auditing Node Logging
+        # 12. Graph Auditing Node Logging
         for s_id, s in self.settlements.settlements.items():
             if s_id not in pre_step_active:
                 cult = self.culture_registry.get_culture(s_id)
