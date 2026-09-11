@@ -2,7 +2,7 @@
 civsim/agents.py
 Combined Engine File: Holds system-wide thresholds, individual Agent entities, 
 DemographicCohort buckets, and the AgentRegistry execution system.
-Natively armored with catch-all kwargs signatures on ALL classes to prevent mismatches.
+Natively armored with catch-all kwargs signatures and starting age generation triggers.
 """
 import random
 
@@ -65,7 +65,7 @@ class DemographicCohort:
         self.y = y
         self.generation = generation
         
-        # Fully armored catch-all properties to handle compression transitions flawlessly
+        # Armored properties to handle compression transitions flawlessly
         self.age = kwargs.get("age", 25)
         self.health = kwargs.get("health", STARTING_HEALTH)
         self.settlement_id = kwargs.get("settlement_id", None)
@@ -84,7 +84,12 @@ class AgentRegistry:
     def create_agent(self, generation, x, y, sex=None):
         agent_id = f"AGT-{generation}-{self.next_agent_id}"
         self.next_agent_id += 1
-        new_agent = Agent(agent_id, generation, x, y, sex=sex, age=0, alive=True)
+        
+        # FIX: Starter generation 0 agents are born as mature fertile adults (Ages 18-30) 
+        # to ensure immediate population reproduction and stop the ghost world scenario.
+        start_age = random.randint(18, 30) if generation == 0 else 0
+        
+        new_agent = Agent(agent_id, generation, x, y, sex=sex, age=start_age, alive=True)
         self.agents[agent_id] = new_agent
         return new_agent
 
