@@ -8,8 +8,7 @@ import random
 import time
 import copy
 from civsim.world import World
-from civsim.agents import Agent
-from civsim.agent_registry import AgentRegistry # Safe Modular Import Linked Here
+from civsim.agents import Agent, AgentRegistry  # Reassembled Import Link Restored
 from civsim.settlements import SettlementRegistry, resolve_settlements
 from civsim.movement import resolve_movement
 from civsim.population import resolve_food_and_health, resolve_birth_and_death
@@ -29,9 +28,6 @@ from civsim.military import resolve_military_and_raiders
 from civsim.religion import resolve_miracles_and_belief     
 from civsim.library import resolve_libraries_and_preservation  
 from civsim.history import CausalityEngine  
-from civsim.world import World
-from civsim.agents import Agent, AgentRegistry  # Safely combined back together!
-from civsim.settlements import SettlementRegistry, resolve_settlements
 
 
 class Simulation:
