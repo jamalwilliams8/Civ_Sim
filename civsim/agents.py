@@ -1,7 +1,7 @@
 ﻿"""
 civsim/agents.py
-Combined Engine File: Holds system-wide thresholds, individual Agent entities, 
-DemographicCohort buckets, and the AgentRegistry execution system.
+Core entity blueprint definition for individual simulation actors and cohort buckets.
+Contains system-wide survival thresholds, breeding ages, and health parameters.
 """
 import random
 
@@ -34,10 +34,18 @@ class Agent:
         self.death_cause = None
         self.resolution = Resolution.INDIVIDUAL
         
-        # Birth traits
+        # Birth metrics
         self.sex = sex if sex is not None else random.choice(["M", "F"])
         self.grit = round(random.uniform(0.3, 1.0), 2)
         self.hardened_veteran = False
+
+    def is_fertile(self) -> bool:
+        """Determines if individual agent parameters allow reproduction sequences."""
+        if not self.alive:
+            return False
+        if self.sex != "F":
+            return False
+        return MIN_BREEDING_AGE <= self.age <= MAX_BREEDING_AGE
 
 class DemographicCohort:
     def __init__(self, count, x, y, generation=0):
@@ -50,24 +58,3 @@ class DemographicCohort:
         self.settlement_id = None
         self.occupation = "FARMER"
         self.resolution = Resolution.COMPRESSED
-
-class AgentRegistry:
-    def __init__(self):
-        self.agents = {}
-        self.cohorts = {}
-        self.next_agent_id = 0
-
-    def create_agent(self, generation, x, y, sex=None):
-        agent_id = f"AGT-{generation}-{self.next_agent_id}"
-        self.next_agent_id += 1
-        new_agent = Agent(agent_id, generation, x, y, sex)
-        self.agents[agent_id] = new_agent
-        return new_agent
-
-    def raw_living_agents(self):
-        """Returns uncompressed individual agents currently alive."""
-        return [a for a in self.agents.values() if a.alive]
-
-    def living_agents(self):
-        """Backward compatibility layout wrapper."""
-        return self.raw_living_agents()
