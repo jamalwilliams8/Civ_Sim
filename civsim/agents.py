@@ -23,13 +23,13 @@ class Resolution:
     LOW = 2
 
 class Agent:
-    def __init__(self, id, generation, x, y, sex=None):
+    def __init__(self, id, generation, x, y, sex=None, age=0):
         self.id = id
         self.generation = generation
         self.x = x
         self.y = y
         self.alive = True
-        self.age = 0
+        self.age = age  # Supported optional keyword input from demographics engines
         self.health = STARTING_HEALTH
         self.wealth = 0.0
         self.intelligence = round(random.uniform(5.0, 15.0), 2)
@@ -69,7 +69,8 @@ class AgentRegistry:
     def create_agent(self, generation, x, y, sex=None):
         agent_id = f"AGT-{generation}-{self.next_agent_id}"
         self.next_agent_id += 1
-        new_agent = Agent(agent_id, generation, x, y, sex)
+        # Match signature layout calls smoothly
+        new_agent = Agent(agent_id, generation, x, y, sex, age=0)
         self.agents[agent_id] = new_agent
         return new_agent
 
