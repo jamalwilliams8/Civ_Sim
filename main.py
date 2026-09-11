@@ -1,13 +1,14 @@
 ﻿"""
 Main entry point for the Artificial Civilization Simulator.
 Runs the simulation loop silently and outputs a clean post-flight executive summary scorecard.
+Synchronized to pass economic, tech, and public treasury matrices to diagnostics.
 """
 
 import sys
 import traceback
 from civsim.config import SimConfig
 from civsim.simulation import Simulation
-from civsim.diagnostics import report
+from civsim.diagnostics import report, print_history_book
 
 
 def main():
@@ -24,23 +25,11 @@ def main():
         # Advance time matrix forward silently
         sim.run(1000)
         
-        # 1. Gather the structural database metrics pass
+        # FIX: Pass the simulation's settlements database directly so the report can read economies
         history_data = report(sim.world, sim.agents, sim.settlements, sim.current_tick)
         
-        # 2. FIX: Print out a crisp, single-page Executive Scorecard summary
-        print("\n====================================================")
-        print(f"        WORLD HISTORY SUMMARY CHRONICLE - YEAR {history_data['ticks_run']}")
-        print("====================================================")
-        print(f"Total Living Population: {history_data['living_population']}")
-        print(f"Global Cemetery Count  : {history_data['historical_dead_count']}")
-        print(f"Average Tile Wild Food : {history_data['avg_tile_food']}")
-        print(f"Active Domains Founded : {history_data['settlements']['active_count']}")
-        print(f"Historical Mortalities : {history_data['death_causes']}")
-        print("----------------------------------------------------")
-        print("Active Civilization Domain Ledger:")
-        for city in history_data['settlements']['active_details']:
-            print(f" * The Domain of {city['name']} at {city['coordinates']} | Citizens: {city['current_population']}")
-        print("====================================================")
+        # Print out the fully updated, multi-stratified History Chronicle Scorecard
+        print_history_book(history_data)
             
     except Exception as e:
         print("\n####################################################")
