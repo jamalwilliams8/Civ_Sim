@@ -30,6 +30,10 @@ def report(world: World, agents: AgentRegistry, settlements: SettlementRegistry,
     for s_id, s in settlements.settlements.items():
         city_name = getattr(s, "name", s.id)
         
+        # FIX: Directly target the actual structural attributes bound to individual settlement nodes
+        has_lib = getattr(s, "has_archive_library", False)
+        lib_count = getattr(s, "library_volume_count", 0)
+        
         info = {
             "name": city_name,
             "coordinates": (s.home_x, s.home_y),
@@ -37,8 +41,8 @@ def report(world: World, agents: AgentRegistry, settlements: SettlementRegistry,
             "crime_rate": getattr(s, "crime_rate", 0.0),
             "guard_force": getattr(s, "guard_force", 0.0),
             "miracle_status": getattr(s, "last_miracle_result", "NO_RECENT_PHENOMENA"),
-            "has_library": getattr(s, "has_archive_library", False),
-            "library_books": getattr(s, "library_volume_count", 0),
+            "has_library": has_lib,
+            "library_books": lib_count,
             "economy": getattr(s, "economy_type", "BARTER_SYSTEM"),
             "price_index": getattr(s, "food_price_index", 1.0),
             "inflation": getattr(s, "inflation_rate", 0.0),
@@ -83,6 +87,7 @@ def print_history_book(report_data: dict) -> None:
     
     print(f"--- ACTIVE CIVILIZATIONS ({report_data['settlements']['active_count']}) ---")
     for city in report_data['settlements']['active_details']:
+        # Fix text string representation formatting
         lib_text = f"YES ({city['library_books']} texts)" if city['has_library'] else "NONE"
         print(f" * The Domain of {city['name']} at {city['coordinates']} | Citizens: {city['current_population']}")
         print(f"   [Society Status] Crime Index: {city['crime_rate']*100:.1f}% | Watch Force: {city['guard_force']*100:.1f}% | Walls: {city['fortifications']} defense")
