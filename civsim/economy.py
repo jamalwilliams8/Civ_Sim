@@ -2,6 +2,7 @@
 civsim/economy.py
 Implements Phase 3 Emergent Market Economics, Supply Chains, Dynamic Prices,
 and Currency Token Monetary Inflation feedback loops.
+Armored with safe attribute fallbacks to prevent initialization crashes.
 """
 
 import random
@@ -13,7 +14,6 @@ def resolve_market_economics(world, agents, settlements, current_tick: int) -> N
     if not active_cities:
         return
 
-    # Map general population load using both cohorts and uncompressed agents
     city_pops = defaultdict(int)
     for agent in agents.raw_living_agents():
         if agent.settlement_id:
@@ -28,24 +28,23 @@ def resolve_market_economics(world, agents, settlements, current_tick: int) -> N
         if total_pop <= 0:
             continue
 
-        # Simulate historical labor assumptions (50% farmers under early matrices)
         num_farmers = max(1, int(total_pop * 0.50))
         num_smiths = max(1, int(total_pop * 0.20))
+        crime_rate = getattr(city, "crime_rate", 0.0)
         
-        # 2. Supply & Demand Pricing Index Rules
-        farmer_ratio = num_farmers / total_pop
-        base_food_price = 1.0 + max(0.0, (0.50 - farmer_ratio) * 4.0)
+        # Supply & Demand Pricing Index Rules
+        or_ratio = num_farmers / total_pop
+        base_food_price = 1.0 + max(0.0, (0.50 - or_ratio) * 4.0)
         
-        # Check current tile climate state for acute supply chain shocks
         tile = world.get_tile(city.home_x, city.home_y)
         climate_state = getattr(world, "current_weather", "NORMAL")
         if tile.zone_type == "TUNDRA":
             climate_state = getattr(world, "northern_weather", "NORMAL")
             
         if climate_state in ["DROUGHT", "FREEZE"]:
-            base_food_price *= 2.0  # Seasonal crunch
+            base_food_price *= 2.0  
 
-        # 3. Currency Token Minting & Inflation Loops
+        # Currency Token Minting & Inflation Loops
         has_currency = total_pop >= 20
         inflation_multiplier = 1.0
         
@@ -53,11 +52,8 @@ def resolve_market_economics(world, agents, settlements, current_tick: int) -> N
             if base_food_price > 2.0:
                 inflation_multiplier = 1.2 + (num_smiths * 0.05)
                 base_food_price *= inflation_multiplier
-                
-                # Inflation dynamically spikes structural friction metrics
-                current_crime = getattr(city, "crime_rate", 0.0)
-                setattr(city, "crime_rate", min(0.95, current_crime + 0.08))
+                crime_rate = min(0.95, crime_rate + 0.08)
 
-        # Cache economy data points directly onto the city node
+        setattr(city, "crime_rate", crime_rate)
         setattr(city, "food_price_index", round(base_food_price, 2))
         setattr(city, "inflation_rate", round((inflation_multiplier - 1.0) * 100, 1))
