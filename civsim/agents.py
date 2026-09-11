@@ -2,6 +2,7 @@
 civsim/agents.py
 Combined Engine File: Holds system-wide thresholds, individual Agent entities, 
 DemographicCohort buckets, and the AgentRegistry execution system.
+Natively armored with catch-all kwargs signatures on ALL classes to prevent mismatches.
 """
 import random
 
@@ -23,42 +24,56 @@ class Resolution:
     LOW = 2
 
 class Agent:
-    def __init__(self, id, generation, x, y, sex=None, age=0):
+    def __init__(self, id, generation, x, y, **kwargs):
         self.id = id
         self.generation = generation
         self.x = x
         self.y = y
-        self.alive = True
-        self.age = age  # Supported optional keyword input from demographics engines
-        self.health = STARTING_HEALTH
-        self.wealth = 0.0
-        self.intelligence = round(random.uniform(5.0, 15.0), 2)
-        self.settlement_id = None
-        self.occupation = "FARMER"
-        self.death_cause = None
-        self.resolution = Resolution.INDIVIDUAL
         
-        # Birth traits
-        self.sex = sex if sex is not None else random.choice(["M", "F"])
-        self.grit = round(random.uniform(0.3, 1.0), 2)
-        self.hardened_veteran = False
+        # Pull incoming attributes dynamically from kwargs, or fallback to clean defaults
+        self.alive = kwargs.get("alive", True)
+        self.age = kwargs.get("age", 0)
+        self.health = kwargs.get("health", STARTING_HEALTH)
+        self.wealth = kwargs.get("wealth", 0.0)
+        self.intelligence = kwargs.get("intelligence", round(random.uniform(5.0, 15.0), 2))
+        self.settlement_id = kwargs.get("settlement_id", None)
+        self.occupation = kwargs.get("occupation", "FARMER")
+        self.death_cause = kwargs.get("death_cause", None)
+        self.resolution = kwargs.get("resolution", Resolution.INDIVIDUAL)
+        self.sex = kwargs.get("sex", random.choice(["M", "F"]))
+        
+        # Core birth traits unique to our expanded features
+        self.grit = kwargs.get("grit", round(random.uniform(0.3, 1.0), 2))
+        self.hardened_veteran = kwargs.get("hardened_veteran", False)
 
     def is_fertile(self) -> bool:
         if not self.alive: return False
         if self.sex != "F": return False
         return MIN_BREEDING_AGE <= self.age <= MAX_BREEDING_AGE
 
+    def die(self, tick: int, cause: str) -> None:
+        """Processes agent expiration, archiving their records safely in the matrix cemetery."""
+        self.alive = False
+        self.health = 0.0
+        self.death_cause = cause
+        self.death_tick = tick
+
 class DemographicCohort:
-    def __init__(self, count, x, y, generation=0):
+    def __init__(self, count, x, y, generation=0, **kwargs):
         self.count = count
         self.x = x
         self.y = y
         self.generation = generation
-        self.age = 25
-        self.health = STARTING_HEALTH
-        self.settlement_id = None
-        self.occupation = "FARMER"
-        self.resolution = Resolution.COMPRESSED
+        
+        # Fully armored catch-all properties to handle compression transitions flawlessly
+        self.age = kwargs.get("age", 25)
+        self.health = kwargs.get("health", STARTING_HEALTH)
+        self.settlement_id = kwargs.get("settlement_id", None)
+        self.occupation = kwargs.get("occupation", "FARMER")
+        self.resolution = kwargs.get("resolution", Resolution.COMPRESSED)
+        
+        self.grit = kwargs.get("grit", 0.60)
+        self.hardened_veteran = kwargs.get("hardened_veteran", False)
 
 class AgentRegistry:
     def __init__(self):
@@ -69,8 +84,7 @@ class AgentRegistry:
     def create_agent(self, generation, x, y, sex=None):
         agent_id = f"AGT-{generation}-{self.next_agent_id}"
         self.next_agent_id += 1
-        # Match signature layout calls smoothly
-        new_agent = Agent(agent_id, generation, x, y, sex, age=0)
+        new_agent = Agent(agent_id, generation, x, y, sex=sex, age=0, alive=True)
         self.agents[agent_id] = new_agent
         return new_agent
 
