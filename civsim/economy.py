@@ -1,38 +1,63 @@
 ﻿"""
 civsim/economy.py
-Implements Phase 3 Barter Markets. Allows neighboring settlements to 
-establish trade agreements, passing surplus resources between coordinates.
+Implements Phase 3 Emergent Market Economics, Supply Chains, Dynamic Prices,
+and Currency Token Monetary Inflation feedback loops.
 """
 
-from civsim.settlements import SettlementRegistry, _within_radius
+import random
+from collections import defaultdict
 
-TRADE_RADIUS = 8  # Maximum tile distance across which barter caravans can travel
-TRADE_EFFICIENCY_GAIN = 0.5
-
-
-def resolve_economic_barter_trade(world, settlements: SettlementRegistry) -> None:
-    """Active settlements share localized resource surpluses with struggling neighbors."""
+def resolve_market_economics(world, agents, settlements, current_tick: int) -> None:
+    """Processes settlement market centers, matching labor supplies to dynamic price indexes."""
     active_cities = [s for s in settlements.settlements.values() if s.active]
-    if len(active_cities) < 2:
+    if not active_cities:
         return
 
-    # Pairwise comparison to find trade opportunities between active nodes
-    for i, city_a in enumerate(active_cities):
-        tile_a = world.get_tile(city_a.home_x, city_a.home_y)
+    # Map general population load using both cohorts and uncompressed agents
+    city_pops = defaultdict(int)
+    for agent in agents.raw_living_agents():
+        if agent.settlement_id:
+            city_pops[agent.settlement_id] += 1
+            
+    for cohort in agents.cohorts.values():
+        if getattr(cohort, "settlement_id", None):
+            city_pops[cohort.settlement_id] += cohort.count
+
+    for city in active_cities:
+        total_pop = city_pops.get(city.id, 0)
+        if total_pop <= 0:
+            continue
+
+        # Simulate historical labor assumptions (50% farmers under early matrices)
+        num_farmers = max(1, int(total_pop * 0.50))
+        num_smiths = max(1, int(total_pop * 0.20))
         
-        for city_b in active_cities[i+1:]:
-            # Verify if settlements are within economic caravan travel radius
-            if _within_radius(city_a.home_x, city_a.home_y, city_b.home_x, city_b.home_y, TRADE_RADIUS):
-                tile_b = world.get_tile(city_b.home_x, city_b.home_y)
+        # 2. Supply & Demand Pricing Index Rules
+        farmer_ratio = num_farmers / total_pop
+        base_food_price = 1.0 + max(0.0, (0.50 - farmer_ratio) * 4.0)
+        
+        # Check current tile climate state for acute supply chain shocks
+        tile = world.get_tile(city.home_x, city.home_y)
+        climate_state = getattr(world, "current_weather", "NORMAL")
+        if tile.zone_type == "TUNDRA":
+            climate_state = getattr(world, "northern_weather", "NORMAL")
+            
+        if climate_state in ["DROUGHT", "FREEZE"]:
+            base_food_price *= 2.0  # Seasonal crunch
+
+        # 3. Currency Token Minting & Inflation Loops
+        has_currency = total_pop >= 20
+        inflation_multiplier = 1.0
+        
+        if has_currency:
+            if base_food_price > 2.0:
+                inflation_multiplier = 1.2 + (num_smiths * 0.05)
+                base_food_price *= inflation_multiplier
                 
-                # Check for food imbalances to execute a trade exchange
-                if tile_a.food_wild > 30.0 and tile_b.food_wild < 10.0:
-                    # Trade food from A to B
-                    transfer = (tile_a.food_wild - tile_b.food_wild) * 0.2
-                    tile_a.food_wild -= transfer
-                    tile_b.food_wild += transfer * (1.0 + TRADE_EFFICIENCY_GAIN)
-                elif tile_b.food_wild > 30.0 and tile_a.food_wild < 10.0:
-                    # Trade food from B to A
-                    transfer = (tile_b.food_wild - tile_a.food_wild) * 0.2
-                    tile_b.food_wild -= transfer
-                    tile_a.food_wild += transfer * (1.0 + TRADE_EFFICIENCY_GAIN)
+                # Inflation dynamically spikes structural friction metrics
+                current_crime = getattr(city, "crime_rate", 0.0)
+                setattr(city, "crime_rate", min(0.95, current_crime + 0.08))
+
+        # Cache economy data points directly onto the city node
+        setattr(city, "food_price_index", round(base_food_price, 2))
+        setattr(city, "inflation_rate", round((inflation_multiplier - 1.0) * 100, 1))
